@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EdgeBoard | NBA Simulation Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #0f172a; color: #f8fafc; }
+        .glow-text { text-shadow: 0 0 10px rgba(52, 211, 153, 0.5); }
+        .stat-card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); }
+        .orbitron { font-family: 'Orbitron', sans-serif; }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <div id="login-view" class="flex items-center justify-center min-h-screen p-4">
+        <div class="bg-gray-900 p-8 rounded-2xl border border-gray-800 shadow-2xl w-full max-w-md">
+            <h1 class="orbitron text-3xl font-bold text-center mb-8 text-emerald-400">EDGEBOARD</h1>
+            <form onsubmit="handleLogin(event)">
+                <div class="mb-4">
+                    <label class="block text-gray-400 text-sm mb-2">OPERATOR ID</label>
+                    <input type="text" id="username" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-emerald-500" required>
+                </div>
+                <div class="mb-6">
+                    <label class="block text-gray-400 text-sm mb-2">ACCESS CODE</label>
+                    <input type="password" id="password" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-emerald-500" required>
+                </div>
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg transition-all">INITIALIZE SYSTEM</button>
+                <p id="error-msg" class="text-red-500 text-center mt-4 hidden">ACCESS DENIED: INVALID CREDENTIALS</p>
+            </form>
+        </div>
+    </div>
+
+    <div id="dashboard-view" class="hidden animate-fade-in">
+        <nav class="bg-gray-900 border-b border-gray-800 p-4 sticky top-0 z-50">
+            <div class="max-w-7xl mx-auto flex justify-between items-center">
+                <h1 class="orbitron text-2xl font-bold text-emerald-400">EDGEBOARD <span class="text-xs text-gray-500 ml-2">V1.0 LIVE</span></h1>
+                <div class="flex gap-4">
+                    <button onclick="triggerSync()" class="btn-sync bg-gray-800 hover:bg-gray-700 text-xs px-4 py-2 rounded border border-gray-700">🔄 RUN FULL SYNC</button>
+                    <button onclick="logout()" class="text-gray-400 hover:text-white text-sm">TERMINATE SESSION</button>
+                </div>
+            </div>
+        </nav>
+
+        <main class="max-w-7xl mx-auto p-6">
+            <div class="grid grid-cols-1 gap-6">
+                <div class="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-800/50 text-gray-400 text-xs uppercase tracking-widest">
+                                <th class="p-4">Player / Game</th>
+                                <th class="p-4">Betting Line</th>
+                                <th class="p-4">Sim Projection</th>
+                                <th class="p-4">Win Prob %</th>
+                                <th class="p-4 text-right">Edge (EV)</th>
+                                <th class="p-4"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="data-table-body">
+                            <tr>
+                                <td colspan="6" class="p-20 text-center text-gray-500">
+                                    Initializing connection to database...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // 1. LOGIN LOGIC
+        function handleLogin(event) {
+            event.preventDefault();
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+            const errorMsg = document.getElementById('error-msg');
+
+            if (user === 'admin' && pass === 'winning') {
+                document.getElementById('login-view').classList.add('hidden');
+                document.getElementById('dashboard-view').classList.remove('hidden');
+                loadDashboardData(); // START FETCHING DATA
+            } else {
+                errorMsg.classList.remove('hidden');
+            }
+        }
+
+        // 2. FETCH DATA FROM FLASK (app.py)
+        async function loadDashboardData() {
+            const tableBody = document.getElementById('data-table-body');
+            
+            try {
+                const response = await fetch('/api/data');
+                const data = await response.json();
+                
+                tableBody.innerHTML = ''; // WIPE THE "INITIALIZING" MESSAGE
+
+                if (data.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="6" class="p-20 text-center text-gray-400">⚠️ No data found. Ensure "run_sims.py" was executed.</td></tr>';
+                    return;
+                }
+
+                data.forEach(row => {
+                    const evNum = parseFloat(row.ev_edge);
+                    let evClass = evNum > 5 ? 'text-emerald-400 glow-text font-bold' : (evNum > 0 ? 'text-yellow-400 font-bold' : 'text-red-400');
+                    
+                    const propMap = {'player_points': 'PTS', 'player_assists': 'AST', 'player_rebounds': 'REB', 'player_threes': '3PM'};
+                    const propDisplay = propMap[row.prop_type] || row.prop_type;
+
+                    tableBody.innerHTML += `
+                        <tr class="stat-card border-b border-gray-800 transition-all hover:bg-gray-800/30">
+                            <td class="p-4">
+                                <p class="text-white font-bold">${row.player_name}</p>
+                                <p class="text-xs text-gray-500 uppercase">${row.team} vs ${row.opponent}</p>
+                            </td>
+                            <td class="p-4 font-mono text-sm text-gray-300">
+                                OVER ${row.line_value} ${propDisplay}
+                            </td>
+                            <td class="p-4">
+                                <span class="text-emerald-300 font-bold">${row.projected_value}</span>
+                            </td>
+                            <td class="p-4">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-white">${row.win_probability}%</span>
+                                    <div class="w-12 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                                        <div class="h-full bg-emerald-500" style="width: ${row.win_probability}%"></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="p-4 text-right text-xl">
+                                <span class="${evClass}">${evNum > 0 ? '+' : ''}${row.ev_edge}%</span>
+                            </td>
+                            <td class="p-4 text-right">
+                                <button class="bg-gray-800 hover:bg-emerald-600 text-white text-[10px] px-3 py-1 rounded transition-colors uppercase font-bold tracking-tighter">View Log</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            } catch (error) {
+                console.error('Error:', error);
+                tableBody.innerHTML = '<tr><td colspan="6" class="p-20 text-center text-red-500 font-mono">CONNECTION FAILED: SERVER UNREACHABLE</td></tr>';
+            }
+        }
+
+        // 3. SYSTEM SYNC
+        async function triggerSync() {
+            const btn = document.querySelector('.btn-sync');
+            btn.innerHTML = '⌛ SYNCING DATA...';
+            btn.disabled = true;
+
+            try {
+                const response = await fetch('/api/sync', { method: 'POST' });
+                const result = await response.json();
+                alert(result.message);
+                loadDashboardData();
+            } catch (e) {
+                alert("SYNC ERROR: SYSTEM TIMEOUT");
+            }
+            btn.innerHTML = '🔄 RUN FULL SYNC';
+            btn.disabled = false;
+        }
+
+        function logout() { location.reload(); }
+    </script>
+</body>
+</html>
