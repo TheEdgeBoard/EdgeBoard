@@ -12,8 +12,8 @@ load_dotenv()
 app = Flask(__name__)
 
 # --- EMAIL SETTINGS (Update these!) ---
-EMAIL_ADDRESS = "your-email@gmail.com"
-EMAIL_PASSWORD = "your-app-password" # Not your login password!
+EMAIL_ADDRESS = "edgeboardanalytics@gmail.com"
+EMAIL_PASSWORD = "13Mizzou!" # Not your login password!
 
 def send_code(target_email, code):
     msg = MIMEText(f"Your EdgeBoard activation code is: {code}")
