@@ -12,6 +12,7 @@
         .glow-green { text-shadow: 0 0 10px rgba(52, 211, 153, 0.4); }
         .animate-fade { animation: fadeIn 0.5s ease-in; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        input::placeholder { color: #475569; }
     </style>
 </head>
 <body class="min-h-screen">
@@ -22,7 +23,7 @@
             <form onsubmit="handleLogin(event)">
                 <div class="mb-4">
                     <label class="block text-gray-500 text-xs font-bold mb-2 tracking-widest uppercase">Operator ID</label>
-                    <input type="text" id="username" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-emerald-500 transition-all" placeholder="Enter Username" required>
+                    <input type="text" id="username" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-emerald-500 transition-all" placeholder="Username" required>
                 </div>
                 <div class="mb-6">
                     <label class="block text-gray-500 text-xs font-bold mb-2 tracking-widest uppercase">Access Code</label>
@@ -51,6 +52,28 @@
         </nav>
 
         <main class="max-w-7xl mx-auto p-6">
+            
+            <div id="admin-panel" class="hidden mb-8 p-8 bg-gray-900 rounded-2xl border border-emerald-500/20 shadow-2xl">
+                <div class="flex items-center gap-2 mb-6">
+                    <div class="h-2 w-2 rounded-full bg-emerald-500"></div>
+                    <h3 class="orbitron text-xs text-emerald-400 tracking-[0.2em] uppercase font-bold">Client Onboarding (Viewer Only)</h3>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <input type="text" id="reg-fullname" placeholder="Full Client Name" class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm text-white focus:border-emerald-500 outline-none">
+                    <input type="email" id="reg-email" placeholder="Email Address" class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm text-white focus:border-emerald-500 outline-none">
+                    <input type="tel" id="reg-phone" placeholder="Phone Number" class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm text-white focus:border-emerald-500 outline-none">
+                    
+                    <input type="text" id="reg-username" placeholder="Create Username" class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm text-white focus:border-emerald-500 outline-none font-bold">
+                    <input type="text" id="reg-password" placeholder="Set Temporary Password" class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm text-white focus:border-emerald-500 outline-none">
+                    
+                    <button onclick="createNewUser()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg transition-all shadow-lg shadow-emerald-900/40 uppercase text-[10px] tracking-[0.2em]">
+                        Authorize Client Access
+                    </button>
+                </div>
+                <p class="text-[10px] text-gray-500 italic">This panel saves contact information and initializes a Read-Only Viewer account.</p>
+            </div>
+
             <div class="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden shadow-2xl">
                 <table class="w-full text-left border-collapse">
                     <thead>
@@ -75,125 +98,135 @@
     </div>
 
     <script>
-        // --- 1. LOGIN HANDLING ---
+        // --- 1. LOGIN ---
         async function handleLogin(event) {
             event.preventDefault();
             const user = document.getElementById('username').value;
             const pass = document.getElementById('password').value;
             const errorMsg = document.getElementById('error-msg');
 
-            try {
-                const response = await fetch('/api/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: user, password: pass })
-                });
+            const response = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: user, password: pass })
+            });
 
-                const result = await response.json();
+            const result = await response.json();
 
-                if (response.ok && result.status === 'success') {
-                    // Store credentials in session (temporary)
-                    sessionStorage.setItem('userRole', result.role);
-                    sessionStorage.setItem('userName', result.username);
+            if (response.ok && result.status === 'success') {
+                sessionStorage.setItem('userRole', result.role);
+                sessionStorage.setItem('userName', result.username);
 
-                    // Switch views
-                    document.getElementById('login-view').classList.add('hidden');
-                    document.getElementById('dashboard-view').classList.remove('hidden');
-                    
-                    // Setup UI based on role
-                    setupUI(result.role, result.username);
-                    loadDashboardData();
-                } else {
-                    errorMsg.classList.remove('hidden');
-                }
-            } catch (err) {
-                console.error("Login Error:", err);
-                alert("Connection failed. Is the server running?");
+                document.getElementById('login-view').classList.add('hidden');
+                document.getElementById('dashboard-view').classList.remove('hidden');
+                
+                setupUI(result.role, result.username);
+                loadDashboardData();
+            } else {
+                errorMsg.classList.remove('hidden');
             }
         }
 
-        // --- 2. UI PERMISSIONS ---
+        // --- 2. PERMISSIONS ---
         function setupUI(role, name) {
             const badge = document.getElementById('user-badge');
             const syncBtn = document.getElementById('admin-sync-btn');
+            const adminPanel = document.getElementById('admin-panel');
             
             badge.innerText = `${name} | ${role}`;
             
-            // Only show the Sync button if user is an Admin
             if (role === 'admin') {
                 syncBtn.classList.remove('hidden');
+                adminPanel.classList.remove('hidden');
             }
         }
 
-        // --- 3. FETCH DATA ---
+        // --- 3. CREATE VIEWER ---
+        async function createNewUser() {
+            const payload = {
+                full_name: document.getElementById('reg-fullname').value,
+                email: document.getElementById('reg-email').value,
+                phone: document.getElementById('reg-phone').value,
+                username: document.getElementById('reg-username').value,
+                password: document.getElementById('reg-password').value
+            };
+
+            if (!payload.username || !payload.password) return alert("Credentials required.");
+
+            const response = await fetch('/api/create-user', {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-User-Role': sessionStorage.getItem('userRole') 
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+            alert(result.message);
+            
+            if (result.status === 'success') {
+                document.querySelectorAll('#admin-panel input').forEach(input => input.value = '');
+            }
+        }
+
+        // --- 4. DATA ENGINE ---
         async function loadDashboardData() {
             const tableBody = document.getElementById('data-table-body');
+            const response = await fetch('/api/data');
+            const data = await response.json();
             
-            try {
-                const response = await fetch('/api/data');
-                const data = await response.json();
-                
-                tableBody.innerHTML = '';
+            tableBody.innerHTML = '';
 
-                if (data.length === 0) {
-                    tableBody.innerHTML = '<tr><td colspan="5" class="p-20 text-center text-gray-500">🛡️ No active edges found in current market.</td></tr>';
-                    return;
-                }
-
-                data.forEach(row => {
-                    const edge = parseFloat(row.ev_edge);
-                    const edgeColor = edge > 8 ? 'text-emerald-400 glow-green' : (edge > 0 ? 'text-yellow-400' : 'text-red-400');
-                    
-                    tableBody.innerHTML += `
-                        <tr class="border-b border-gray-800/50 hover:bg-gray-800/20 transition-colors">
-                            <td class="p-4">
-                                <div class="font-bold text-white">${row.player_name}</div>
-                                <div class="text-[10px] text-gray-500 uppercase">${row.team} vs ${row.opponent}</div>
-                            </td>
-                            <td class="p-4 font-mono text-sm text-gray-400">
-                                OVER ${row.line_value} ${row.prop_type.replace('player_', '').toUpperCase()}
-                            </td>
-                            <td class="p-4 text-emerald-300 font-bold">${row.projected_value}</td>
-                            <td class="p-4">
-                                <span class="text-white text-sm font-bold">${row.win_probability}%</span>
-                                <div class="w-16 h-1 bg-gray-800 rounded-full mt-1">
-                                    <div class="h-full bg-emerald-500 rounded-full" style="width: ${row.win_probability}%"></div>
-                                </div>
-                            </td>
-                            <td class="p-4 text-right font-bold text-xl ${edgeColor}">
-                                ${edge > 0 ? '+' : ''}${edge}%
-                            </td>
-                        </tr>
-                    `;
-                });
-            } catch (err) {
-                tableBody.innerHTML = '<tr><td colspan="5" class="p-20 text-center text-red-500">SYNC ERROR: DATABASE UNREACHABLE</td></tr>';
+            if (data.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="5" class="p-20 text-center text-gray-500 italic">No edges found in the current market.</td></tr>';
+                return;
             }
+
+            data.forEach(row => {
+                const edge = parseFloat(row.ev_edge);
+                const edgeColor = edge > 8 ? 'text-emerald-400 glow-green' : (edge > 0 ? 'text-yellow-400' : 'text-red-400');
+                
+                tableBody.innerHTML += `
+                    <tr class="border-b border-gray-800/50 hover:bg-gray-800/20 transition-colors">
+                        <td class="p-4">
+                            <div class="font-bold text-white">${row.player_name}</div>
+                            <div class="text-[10px] text-gray-500 uppercase">${row.team} vs ${row.opponent}</div>
+                        </td>
+                        <td class="p-4 font-mono text-xs text-gray-400">
+                            OVER ${row.line_value} ${row.prop_type.replace('player_', '').toUpperCase()}
+                        </td>
+                        <td class="p-4 text-emerald-300 font-bold">${row.projected_value}</td>
+                        <td class="p-4">
+                            <span class="text-white text-xs font-bold">${row.win_probability}%</span>
+                            <div class="w-16 h-1 bg-gray-800 rounded-full mt-1">
+                                <div class="h-full bg-emerald-500 rounded-full" style="width: ${row.win_probability}%"></div>
+                            </div>
+                        </td>
+                        <td class="p-4 text-right font-bold text-lg ${edgeColor}">
+                            ${edge > 0 ? '+' : ''}${edge}%
+                        </td>
+                    </tr>
+                `;
+            });
         }
 
-        // --- 4. SECURE SYNC TRIGGER ---
+        // --- 5. SYNC ---
         async function triggerSync() {
             const syncBtn = document.getElementById('admin-sync-btn');
-            const role = sessionStorage.getItem('userRole');
-            
-            syncBtn.innerText = "⏳ SYNCING...";
+            syncBtn.innerText = "⏳ PROCESSING...";
             syncBtn.disabled = true;
 
-            try {
-                const response = await fetch('/api/sync', {
-                    method: 'POST',
-                    headers: { 'X-User-Role': role } // Send the role for server-side verification
-                });
+            const response = await fetch('/api/sync', {
+                method: 'POST',
+                headers: { 'X-User-Role': sessionStorage.getItem('userRole') }
+            });
 
-                const result = await response.json();
-                alert(result.message);
-                loadDashboardData();
-            } catch (err) {
-                alert("Critical failure during sync.");
-            } finally {
-                syncBtn.innerText = "🔄 RUN GLOBAL SYNC";
-                syncBtn.disabled = false;
-            }
+            const result = await response.json();
+            alert(result.message);
+            syncBtn.innerText = "🔄 RUN GLOBAL SYNC";
+            syncBtn.disabled = false;
+            loadDashboardData();
         }
 
         function logout() {
