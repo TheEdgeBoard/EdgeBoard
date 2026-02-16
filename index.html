@@ -1,3 +1,5 @@
+The Full index.html
+HTML
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -162,7 +164,22 @@
         async function loadAnalytics() {
             const res = await fetch('/api/data');
             const data = await res.json();
-            document.getElementById('data-table-body').innerHTML = data.map(d => {
+            const tableBody = document.getElementById('data-table-body');
+
+            // --- ALL-STAR BREAK / NO GAMES HANDLER ---
+            if (data.length === 0) {
+                tableBody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="p-12 text-center">
+                            <div class="orbitron text-emerald-500/50 text-xs tracking-widest mb-2">SYSTEM STANDBY</div>
+                            <div class="text-gray-500 text-sm">No active games or simulations found. <br> Systems will resume for the next scheduled NBA slate.</div>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tableBody.innerHTML = data.map(d => {
                 const edge = parseFloat(d.ev_edge);
                 let colorClass = "text-yellow-500"; 
                 if (edge >= 10) colorClass = "text-emerald-400 tier-max font-black"; 
