@@ -1,173 +1,105 @@
 import sqlite3
-import time
-import requests
 import pandas as pd
-from bs4 import BeautifulSoup
-import re
-from nba_api.stats.endpoints import leaguedashteamstats, playergamelog
-from nba_api.stats.static import players, teams
+import time
+from nba_api.stats.endpoints import playergamelog
+from nba_api.stats.static import players
 
-def get_db_connection():
-    return sqlite3.connect('edgeboard.db')
+# Database Path Configuration
+DB_PATH = '/home/TheEdgeBoard/EdgeBoard/edgeboard.db'
 
-# --- PART 1: SCRAPE STARTERS FROM BASKETBALL MONSTER ---
-def get_starters_from_web():
-    url = "https://basketballmonster.com/nbalineups.aspx"
-    print(f"🕵️  Scraping Starters from: {url}")
+def sync_player_performance():
+    """
+    Fetches the last 6 games for every active prospect and calculates:
+    1. Score in Last Game (Momentum check)
+    2. Hits in Last 6 Games (Consistency check)
+    3. Average over Last 6 Games (Trend baseline)
+    """
+    print("Starting Performance Sync...")
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
     
+    # 1. Get the list of players & lines we need to check
     try:
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-        
-        soup = BeautifulSoup(response.text, 'lxml')
-        
-        # Basketball Monster usually puts player names in specific table cells
-        # We look for links to player pages or table cells that hold names
-        player_names = set()
-
-        # Find all cells that might contain players
-        # The site structure often changes, but names are usually inside <td> tags
-        # We will look for <td> tags that don't have certain classes or styles
-        # A more robust way is to find all <a> tags that link to player profiles if possible
-        # For now, we scrape text and clean it
-        
-        # Strategy: Look for the specific grid structure
-        # Rows often start with "PG", "SG", "SF", "PF", "C"
-        rows = soup.find_all('tr')
-        
-        for row in rows:
-            cells = row.find_all('td')
-            if not cells: 
-                continue
-                
-            first_cell = cells[0].get_text(strip=True)
-            
-            # Check if this row is a position row
-            if first_cell in ['PG', 'SG', 'SF', 'PF', 'C']:
-                # The players are usually in the 2nd (Home) and 3rd (Away) columns
-                # or scattered depending on the layout. 
-                # BasketballMonster usually does: Pos | Visitor Player | Home Player
-                
-                if len(cells) >= 3:
-                    # Visitor Player
-                    p1 = cells[1].get_text(strip=True)
-                    # Home Player
-                    p2 = cells[2].get_text(strip=True)
-                    
-                    if p1: player_names.add(clean_name(p1))
-                    if p2: player_names.add(clean_name(p2))
-
-        # Convert to list
-        starters = list(player_names)
-        print(f"✅ Found {len(starters)} projected starters.")
-        return starters
-
+        prospects = pd.read_sql("SELECT * FROM daily_prospects", conn)
     except Exception as e:
-        print(f"❌ Error scraping Basketball Monster: {e}")
-        # Fallback to a small list if site is down so script doesn't crash
-        return ["LeBron James", "Stephen Curry", "Luka Doncic", "Nikola Jokic", "Giannis Antetokounmpo"]
-
-def clean_name(name):
-    # Basketball Monster adds status tags like "LeBron James Q" or " P"
-    # We remove any single capital letter at the end or " GTD"
-    
-    # Remove ' Q', ' P', ' O', ' D', ' GTD' from end of string
-    name = re.sub(r'\s+[QPOD]$', '', name) 
-    name = re.sub(r'\s+GTD$', '', name)
-    return name.strip()
-
-# --- PART 2: UPDATE TEAM METRICS ---
-def sync_team_metrics():
-    print("🔄 Connecting to NBA.com for Team Stats...")
-    
-    try:
-        # Fetch team stats for the Current Season
-        team_stats = leaguedashteamstats.LeagueDashTeamStats(
-            season='2025-26', 
-            measure_type_detailed_defense='Advanced'
-        ).get_data_frames()[0]
-    except Exception as e:
-        print(f"⚠️ Error fetching team stats (Check connection): {e}")
+        print(f"Error reading prospects: {e}")
         return
 
-    # Create Lookup for Abbreviations
-    nba_teams = teams.get_teams()
-    team_map = {team['full_name']: team['abbreviation'] for team in nba_teams}
+    print(f"Analyzing {len(prospects)} betting lines...")
 
-    conn = get_db_connection()
-    c = conn.cursor()
-
-    for index, row in team_stats.iterrows():
-        team_name = row['TEAM_NAME']
-        team_abbr = team_map.get(team_name)
-        if not team_abbr: team_abbr = team_name[:3].upper()
-
-        pace = row['PACE']
-        def_rating = row['DEF_RATING']
-        
-        c.execute('''
-            INSERT INTO team_metrics (team_abbrev, pace, defensive_rating)
-            VALUES (?, ?, ?)
-            ON CONFLICT(team_abbrev) DO UPDATE SET
-            pace=excluded.pace,
-            defensive_rating=excluded.defensive_rating
-        ''', (team_abbr, pace, def_rating))
-    
-    conn.commit()
-    conn.close()
-    print("✅ Team Metrics Updated.")
-
-# --- PART 3: UPDATE PLAYER LOGS ---
-def sync_player_logs():
-    # 1. Get the list from the web
-    target_players = get_starters_from_web()
-    
-    conn = get_db_connection()
-    c = conn.cursor()
-    
-    print(f"🔄 Syncing Last 6 Games for {len(target_players)} players...")
-    print("   (This may take 1-2 minutes to respect API rate limits)")
-
-    count = 0
-    for name in target_players:
-        if name == "" or "Lineups" in name: continue
-
-        # 1. Find Player ID
-        nba_players = players.find_players_by_full_name(name)
-        if not nba_players:
-            # Try fuzzy matching if exact name fails? (Skipping for speed now)
-            print(f"   ⚠️ NBA.com ID not found: {name}")
-            continue
-        
-        player_id = nba_players[0]['id']
-        
-        # 2. Fetch Game Logs
-        # DELAY IS CRITICAL: If you go too fast, NBA.com bans your IP for an hour.
-        time.sleep(0.65) 
-        
+    # 2. Iterate through each player/prop combination
+    for index, row in prospects.iterrows():
         try:
-            logs = playergamelog.PlayerGameLog(player_id=player_id, season='2025-26').get_data_frames()[0]
-            last_6 = logs.head(6)
+            p_id = row['player_id']
+            line = row['market_line']
+            prop = row['prop_type']
+            
+            # 3. Fetch Game Logs (2025-26 Season)
+            # We add a tiny sleep to be nice to the NBA API limits
+            time.sleep(0.6) 
+            gamelog = playergamelog.PlayerGameLog(player_id=p_id, season='2025-26')
+            df_logs = gamelog.get_data_frames()[0]
+            
+            # We only need the last 6 games
+            last_6 = df_logs.head(6).copy()
+            
+            if last_6.empty:
+                print(f"No logs for {row['player_name']}")
+                continue
 
-            for i, game in last_6.iterrows():
-                c.execute('''
-                    INSERT INTO player_logs (player_name, game_date, pts, reb, ast, threes_made, minutes_played)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                ''', (name, game['GAME_DATE'], game['PTS'], game['REB'], game['AST'], game['FG3M'], game['MIN']))
+            # 4. Map Prop Types to API Columns
+            # API Columns: PTS, REB, AST, FG3M, FG3A, FGM, FGA
+            stat_map = {
+                'PTS': 'PTS',
+                'REB': 'REB',
+                'AST': 'AST',
+                'FG3M': 'FG3M', # 3-Pointers Made
+                'FG3A': 'FG3A', # 3-Pointers Attempted
+                'FGM': 'FGM',   # Field Goals Made
+                'FGA': 'FGA'    # Field Goals Attempted
+            }
+
+            # 5. Calculate the 'ACTUAL' value for the specific prop
+            if prop in stat_map:
+                last_6['ACTUAL'] = last_6[stat_map[prop]]
+            elif prop == 'PRA': # Points + Rebounds + Assists
+                last_6['ACTUAL'] = last_6['PTS'] + last_6['REB'] + last_6['AST']
+            elif prop == 'RA': # Rebounds + Assists
+                last_6['ACTUAL'] = last_6['REB'] + last_6['AST']
+            else:
+                # If prop type is unknown/unsupported, skip calculation
+                continue
+
+            # 6. Calculate Metrics
+            # A. Last Game Score (For Momentum Filter)
+            score_last_game = float(last_6.iloc[0]['ACTUAL'])
             
-            count += 1
-            if count % 10 == 0:
-                print(f"   ... Synced {count} players")
-                conn.commit() # Save progress every 10 players
+            # B. Hits in Last 6 (For Consistency Filter)
+            hits_over = int((last_6['ACTUAL'] > line).sum())
+            hits_under = int((last_6['ACTUAL'] < line).sum())
             
+            # C. Average (For Simulation Baseline)
+            avg_last_6 = float(last_6['ACTUAL'].mean())
+
+            # 7. Update Database
+            conn.execute('''
+                UPDATE daily_prospects 
+                SET score_last_game = ?, 
+                    hits_last_6_over = ?, 
+                    hits_last_6_under = ?, 
+                    avg_last_6 = ?
+                WHERE player_id = ? AND prop_type = ?
+            ''', (score_last_game, hits_over, hits_under, avg_last_6, p_id, prop))
+            
+            print(f"Synced {row['player_name']} {prop}: Last={score_last_game}, Over={hits_over}/6")
+
         except Exception as e:
-            print(f"   ❌ Error fetching {name}")
+            print(f"Failed sync for {row['player_name']}: {e}")
+            continue
 
     conn.commit()
     conn.close()
-    print(f"✅ Player Logs Sync Complete. ({count} players updated)")
+    print("Performance Sync Complete.")
 
 if __name__ == "__main__":
-    sync_team_metrics()
-    sync_player_logs()
+    sync_player_performance()

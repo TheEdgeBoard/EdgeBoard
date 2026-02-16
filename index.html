@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EdgeBoard | Intel Dashboard</title>
+    <title>EdgeBoard | High-Conviction Intelligence</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
@@ -14,6 +14,7 @@
         input::placeholder { color: #475569; }
         .tab-active { background: #10b981 !important; color: white !important; border-bottom: 3px solid #059669; }
         .tab-inactive { background: #1e293b !important; color: #94a3b8 !important; }
+        /* Professional Glow for high-value targets */
         .tier-max { text-shadow: 0 0 10px rgba(52, 211, 153, 0.6); }
     </style>
 </head>
@@ -22,36 +23,10 @@
     <div id="login-view" class="flex items-center justify-center min-h-screen p-4">
         <div class="bg-gray-900 p-8 rounded-2xl border border-gray-800 shadow-2xl w-full max-w-md">
             <h1 class="orbitron text-3xl font-bold text-center mb-8 text-emerald-400 tracking-tighter">EDGEBOARD</h1>
-            <div id="auth-box" class="space-y-4">
+            <div class="space-y-4">
                 <input type="text" id="username" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:border-emerald-500 outline-none" placeholder="Operator ID">
                 <input type="password" id="password" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:border-emerald-500 outline-none" placeholder="Access Code">
                 <button onclick="handleLogin()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg transition-all">INITIALIZE SYSTEM</button>
-                <button onclick="showView('register')" class="w-full mt-4 text-gray-500 hover:text-emerald-400 text-[10px] font-bold uppercase tracking-widest transition-all">Request Access / Sign Up</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="register-view" class="hidden flex items-center justify-center min-h-screen p-4">
-        <div class="bg-gray-900 p-8 rounded-2xl border border-gray-800 shadow-2xl w-full max-w-md">
-            <h2 class="orbitron text-xl font-bold text-center mb-6 text-emerald-400">PROSPECT REGISTRATION</h2>
-            <div class="space-y-4">
-                <input type="text" id="reg-fullname" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3" placeholder="Full Name">
-                <input type="text" id="reg-username" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3" placeholder="Requested Username">
-                <input type="email" id="reg-email" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3" placeholder="Email Address">
-                <button onclick="handleRegister()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg">REQUEST ACCESS LINK</button>
-                <button onclick="showView('login')" class="w-full text-gray-500 text-[10px] font-bold uppercase mt-2">Back to Login</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="setup-view" class="hidden flex items-center justify-center min-h-screen p-4">
-        <div class="bg-gray-900 p-8 rounded-2xl border border-emerald-500 shadow-2xl w-full max-w-md">
-            <h2 class="orbitron text-xl font-bold text-center mb-2 text-emerald-400">ESTABLISH SECURITY</h2>
-            <p class="text-gray-400 text-center text-xs mb-6 uppercase tracking-widest">Set your account password</p>
-            <div class="space-y-4">
-                <input type="password" id="setup-password" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-emerald-400" placeholder="New Password">
-                <input type="password" id="setup-confirm" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-emerald-400" placeholder="Confirm Password">
-                <button onclick="handlePasswordSetup()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg">ACTIVATE ACCOUNT</button>
             </div>
         </div>
     </div>
@@ -61,44 +36,63 @@
             <div class="max-w-7xl mx-auto flex justify-between items-center">
                 <h1 class="orbitron text-xl font-bold text-emerald-400">EDGEBOARD <span class="text-[10px] text-gray-500 ml-2 uppercase" id="user-badge"></span></h1>
                 <div class="flex gap-4">
-                    <button id="admin-sync-btn" onclick="triggerSync()" class="hidden bg-emerald-600/10 text-emerald-400 text-xs font-bold px-4 py-2 rounded border border-emerald-500/30 transition-all">
-                        <span id="sync-text">🔄 CONTEXTUAL SYNC</span>
-                    </button>
+                    <button id="admin-sync-btn" onclick="triggerSync()" class="hidden bg-emerald-600/10 text-emerald-400 text-xs font-bold px-4 py-2 rounded border border-emerald-500/30">🔄 RUN HIGH-CONVICTION SYNC</button>
                     <button onclick="location.reload()" class="text-gray-500 hover:text-white text-xs font-bold uppercase">Logout</button>
                 </div>
             </div>
         </nav>
 
         <div id="admin-tabs" class="hidden max-w-7xl mx-auto px-6 mt-6 flex gap-2">
-            <button onclick="switchTab('analytics')" id="tab-analytics" class="orbitron text-[10px] tracking-widest px-6 py-3 rounded-t-lg font-bold transition-all tab-active">SYSTEM ANALYTICS</button>
-            <button onclick="switchTab('management')" id="tab-management" class="orbitron text-[10px] tracking-widest px-6 py-3 rounded-t-lg font-bold transition-all tab-inactive">CLIENT DIRECTORY</button>
+            <button onclick="switchTab('analytics')" id="tab-analytics" class="orbitron text-[10px] tracking-widest px-6 py-3 rounded-t-lg font-bold transition-all tab-active">
+                SYSTEM ANALYTICS
+            </button>
+            <button onclick="switchTab('management')" id="tab-management" class="orbitron text-[10px] tracking-widest px-6 py-3 rounded-t-lg font-bold transition-all tab-inactive">
+                CLIENT MANAGEMENT
+            </button>
         </div>
 
-        <main class="max-w-7xl mx-auto p-6">
+        <main class="max-w-7xl mx-auto p-6 space-y-8">
+            
             <div id="section-analytics" class="space-y-6">
                 <section class="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden shadow-2xl">
                     <table class="w-full text-left">
                         <thead class="bg-gray-800/50 text-gray-500 text-[10px] uppercase tracking-widest border-b border-gray-800">
                             <tr>
-                                <th class="p-4">Player / Context</th>
-                                <th class="p-4">Market Line</th>
-                                <th class="p-4 text-center">Projected μ</th>
+                                <th class="p-4">Player / Momentum</th>
+                                <th class="p-4">Pick / Line</th>
+                                <th class="p-4 text-center">Confidence</th>
                                 <th class="p-4 text-right">EV Edge</th>
                             </tr>
                         </thead>
-                        <tbody id="data-table-body"></tbody>
+                        <tbody id="data-table-body">
+                            </tbody>
                     </table>
                 </section>
             </div>
 
             <div id="section-management" class="hidden space-y-8">
-                <section class="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden">
+                <section class="bg-gray-900 p-8 rounded-2xl border border-emerald-500/20 glow-emerald">
+                    <h3 class="orbitron text-xs text-emerald-400 mb-6 tracking-widest uppercase font-bold">New Client Onboarding</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <input type="text" id="reg-fullname" placeholder="Full Name" class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm outline-none focus:border-emerald-500">
+                        <input type="email" id="reg-email" placeholder="Client Email" class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm outline-none focus:border-emerald-500">
+                        <input type="text" id="reg-username" placeholder="Username" class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm outline-none focus:border-emerald-500 font-bold">
+                        <input type="text" id="reg-password" placeholder="Password" class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm outline-none focus:border-emerald-500">
+                        <input type="text" id="reg-phone" placeholder="Phone" class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm outline-none focus:border-emerald-500">
+                        <button onclick="createNewUser()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg text-xs tracking-widest uppercase">Send Verification</button>
+                    </div>
+                </section>
+
+                <section class="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden shadow-2xl">
+                    <div class="p-4 bg-gray-800/50 border-b border-gray-800">
+                        <h3 class="orbitron text-[10px] text-emerald-400 tracking-widest uppercase font-bold">Active Client Directory</h3>
+                    </div>
                     <table class="w-full text-left">
                         <thead class="text-[10px] text-gray-500 uppercase border-b border-gray-800">
                             <tr>
-                                <th class="p-4">Active Operator</th>
-                                <th class="p-4">Contact</th>
-                                <th class="p-4 text-right">Access</th>
+                                <th class="p-4">Client</th>
+                                <th class="p-4">Credentials</th>
+                                <th class="p-4 text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="user-list-body" class="text-sm"></tbody>
@@ -108,61 +102,36 @@
         </main>
     </div>
 
+    <div id="verify-modal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div class="bg-gray-900 p-8 rounded-2xl border border-emerald-500 w-full max-w-sm shadow-2xl">
+            <h2 class="orbitron text-xl font-bold mb-2 text-center text-emerald-400">Security Code</h2>
+            <p class="text-gray-400 text-center text-sm mb-6">Enter the 6-digit code sent to the client's email.</p>
+            <input type="text" id="verify-code" maxlength="6" class="w-full bg-gray-800 border-2 border-emerald-500/50 p-4 text-center text-3xl tracking-[0.5em] rounded-xl text-emerald-400 font-bold mb-6 outline-none" placeholder="000000">
+            <button onclick="confirmCode()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl transition-all">ACTIVATE</button>
+        </div>
+    </div>
+
     <script>
-        // --- ROUTING LOGIC ---
-        window.onload = () => {
-            const params = new URLSearchParams(window.location.search);
-            const token = params.get('setup_token');
-            if (token) {
-                showView('setup');
-                sessionStorage.setItem('temp_token', token);
-            }
-        };
+        // --- UI & TAB LOGIC ---
+        function switchTab(tabName) {
+            const aSec = document.getElementById('section-analytics');
+            const mSec = document.getElementById('section-management');
+            const aBtn = document.getElementById('tab-analytics');
+            const mBtn = document.getElementById('tab-management');
 
-        function showView(view) {
-            document.getElementById('login-view').classList.add('hidden');
-            document.getElementById('register-view').classList.add('hidden');
-            document.getElementById('setup-view').classList.add('hidden');
-            document.getElementById('dashboard-view').classList.add('hidden');
-            document.getElementById(`${view}-view`).classList.remove('hidden');
-        }
-
-        // --- AUTH & REGISTRATION ---
-        async function handleRegister() {
-            const payload = {
-                full_name: document.getElementById('reg-fullname').value,
-                username: document.getElementById('reg-username').value,
-                email: document.getElementById('reg-email').value
-            };
-            const res = await fetch('/api/register', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(payload)
-            });
-            const data = await res.json();
-            alert(data.message);
-            if (res.ok) showView('login');
-        }
-
-        async function handlePasswordSetup() {
-            const pass = document.getElementById('setup-password').value;
-            const conf = document.getElementById('setup-confirm').value;
-            const token = sessionStorage.getItem('temp_token');
-
-            if (pass !== conf) return alert("Passwords do not match.");
-            
-            const res = await fetch('/api/complete-signup', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ token, password: pass })
-            });
-            const data = await res.json();
-            alert(data.message);
-            if (res.ok) {
-                window.location.href = '/'; // Redirect to clean URL login
+            if (tabName === 'analytics') {
+                aSec.classList.remove('hidden'); mSec.classList.add('hidden');
+                aBtn.classList.add('tab-active'); aBtn.classList.remove('tab-inactive');
+                mBtn.classList.add('tab-inactive'); mBtn.classList.remove('tab-active');
+            } else {
+                aSec.classList.add('hidden'); mSec.classList.remove('hidden');
+                mBtn.classList.add('tab-active'); mBtn.classList.remove('tab-inactive');
+                aBtn.classList.add('tab-inactive'); aBtn.classList.remove('tab-active');
+                loadUserList();
             }
         }
 
+        // --- AUTH & DATA LOADING ---
         async function handleLogin() {
             const user = document.getElementById('username').value;
             const pass = document.getElementById('password').value;
@@ -175,13 +144,13 @@
             if (res.ok) {
                 sessionStorage.setItem('userRole', data.role);
                 sessionStorage.setItem('userName', data.username);
-                showView('dashboard');
+                document.getElementById('login-view').classList.add('hidden');
+                document.getElementById('dashboard-view').classList.remove('hidden');
                 setupUI(data.role, data.username);
                 loadAnalytics();
-            } else { alert("Credentials Invalid."); }
+            } else { alert("Login Error: Credentials Rejected."); }
         }
 
-        // --- DASHBOARD LOGIC ---
         function setupUI(role, name) {
             document.getElementById('user-badge').innerText = `${name} | ${role}`;
             if (role === 'admin') {
@@ -190,62 +159,132 @@
             }
         }
 
+        // --- UPDATED ANALYTICS DISPLAY ---
         async function loadAnalytics() {
             const res = await fetch('/api/data');
             const data = await res.json();
-            const tableBody = document.getElementById('data-table-body');
             
-            if (data.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="4" class="p-12 text-center text-gray-500 orbitron text-xs">System Standby: No Active Data</td></tr>`;
-                return;
-            }
+            // Map raw prop codes to professional names
+            const propMap = {
+                'PTS': 'Points', 'REB': 'Rebounds', 'AST': 'Assists', 
+                'PRA': 'Pts+Reb+Ast', 'RA': 'Reb+Ast', 
+                'FG3M': '3PT Made', 'FG3A': '3PT Att', 
+                'FGM': 'FG Made', 'FGA': 'FG Att'
+            };
 
-            tableBody.innerHTML = data.map(d => {
+            document.getElementById('data-table-body').innerHTML = data.map(d => {
                 const edge = parseFloat(d.ev_edge);
-                let colorClass = edge >= 10 ? "text-emerald-400 tier-max font-black" : (edge >= 5 ? "text-emerald-500 font-bold" : "text-yellow-500");
+                const winRate = parseFloat(d.win_rate);
+                
+                // Tiered Edge Coloring
+                let edgeColor = "text-yellow-500"; 
+                if (edge >= 10) edgeColor = "text-emerald-400 tier-max font-black"; 
+                else if (edge >= 6) edgeColor = "text-emerald-500 font-bold";
+                else if (edge >= 3) edgeColor = "text-green-600 font-bold";
+
+                // Pick Coloring (Over vs Under)
+                const pickColor = d.suggestion === "OVER" ? "text-emerald-400" : "text-sky-400";
+                
+                // Display Name for Prop
+                const displayProp = propMap[d.prop_type] || d.prop_type;
+
                 return `
-                <tr class="border-b border-gray-800 hover:bg-gray-800/20">
-                    <td class="p-4"><div class="font-bold text-white">${d.player_name} <span class="text-xs ml-1">${d.context_tags || ''}</span></div><div class="text-[10px] text-gray-500 uppercase">${d.team}</div></td>
-                    <td class="p-4 text-xs text-gray-400">${d.line_value} ${d.prop_type}</td>
-                    <td class="p-4 text-white text-center font-medium">${d.projected_value}</td>
-                    <td class="p-4 text-right ${colorClass}">${edge.toFixed(2)}%</td>
-                </tr>`;
+                <tr class="border-b border-gray-800 hover:bg-gray-800/20 transition-all">
+                    <td class="p-4">
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-white">${d.player_name}</span>
+                            <span class="text-xs bg-gray-800 px-2 py-0.5 rounded text-gray-400 border border-gray-700" title="Context Insight">${d.context_tags || '—'}</span>
+                        </div>
+                        <div class="text-[10px] text-gray-500 uppercase tracking-tighter font-bold">${d.team}</div>
+                    </td>
+                    <td class="p-4 text-xs">
+                        <div class="text-gray-400 mb-1">${d.line_value} ${displayProp}</div>
+                        <div class="${pickColor} font-black text-[10px] tracking-widest uppercase bg-gray-900 inline-block px-2 py-1 rounded border border-gray-800 shadow-sm">${d.suggestion}</div>
+                    </td>
+                    <td class="p-4 text-center">
+                        <div class="text-white font-medium">${d.projected_value}</div>
+                        <div class="text-[9px] text-gray-400 mt-0.5">${winRate}% Sim Win</div>
+                    </td>
+                    <td class="p-4 text-right ${edgeColor}">${edge.toFixed(2)}%</td>
+                </tr>
+                `;
             }).join('');
         }
 
-        function switchTab(tab) {
-            document.getElementById('section-analytics').classList.toggle('hidden', tab !== 'analytics');
-            document.getElementById('section-management').classList.toggle('hidden', tab !== 'management');
-            document.getElementById('tab-analytics').className = tab === 'analytics' ? 'orbitron text-[10px] tracking-widest px-6 py-3 rounded-t-lg font-bold tab-active' : 'orbitron text-[10px] tracking-widest px-6 py-3 rounded-t-lg font-bold tab-inactive';
-            document.getElementById('tab-management').className = tab === 'management' ? 'orbitron text-[10px] tracking-widest px-6 py-3 rounded-t-lg font-bold tab-active' : 'orbitron text-[10px] tracking-widest px-6 py-3 rounded-t-lg font-bold tab-inactive';
-            if (tab === 'management') loadUserList();
+        // --- CRM ACTIONS ---
+        async function createNewUser() {
+            const payload = {
+                full_name: document.getElementById('reg-fullname').value,
+                email: document.getElementById('reg-email').value,
+                username: document.getElementById('reg-username').value,
+                password: document.getElementById('reg-password').value,
+                phone: document.getElementById('reg-phone').value
+            };
+            sessionStorage.setItem('pendingUser', payload.username);
+            const res = await fetch('/api/create-user', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-User-Role': 'admin'},
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) document.getElementById('verify-modal').classList.remove('hidden');
+            else alert("Error sending code.");
+        }
+
+        async function confirmCode() {
+            const username = sessionStorage.getItem('pendingUser');
+            const code = document.getElementById('verify-code').value;
+            const res = await fetch('/api/verify-code', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username, code})
+            });
+            if (res.ok) { alert("Client Activated."); location.reload(); }
+            else alert("Invalid Code.");
         }
 
         async function loadUserList() {
             const res = await fetch('/api/get-users', { headers: {'X-User-Role': 'admin'} });
             const users = await res.json();
             document.getElementById('user-list-body').innerHTML = users.map(u => `
-                <tr class="border-b border-gray-800 hover:bg-gray-800/30">
-                    <td class="p-4 font-bold text-white">${u.full_name}</td>
-                    <td class="p-4 text-xs text-gray-400">${u.email}</td>
-                    <td class="p-4 text-right"><button onclick="deleteUser('${u.username}')" class="text-red-500 text-[10px] font-bold uppercase">Revoke</button></td>
-                </tr>`).join('');
+                <tr class="border-b border-gray-800 hover:bg-gray-800/30 transition-all">
+                    <td class="p-4">
+                        <div class="font-bold text-white">${u.full_name}</div>
+                        <div class="text-[10px] text-gray-500">${u.email}</div>
+                    </td>
+                    <td class="p-4">
+                        <div class="text-xs text-emerald-500 font-mono">${u.username} / ${u.password}</div>
+                    </td>
+                    <td class="p-4 text-right space-x-3">
+                        <button onclick="deleteUser('${u.username}')" class="text-red-500 text-[10px] font-bold uppercase hover:text-red-400">Revoke</button>
+                    </td>
+                </tr>
+            `).join('');
         }
 
         async function deleteUser(user) {
-            if (confirm(`Revoke access for ${user}?`)) {
-                await fetch(`/api/delete-user/${user}`, { method: 'DELETE', headers: {'X-User-Role': 'admin'} });
-                loadUserList();
-            }
+            if (!confirm(`Revoke access for ${user}?`)) return;
+            await fetch(`/api/delete-user/${user}`, { method: 'DELETE', headers: {'X-User-Role': 'admin'} });
+            loadUserList();
         }
 
         async function triggerSync() {
             const btn = document.getElementById('admin-sync-btn');
-            btn.disabled = true; btn.classList.add('opacity-50');
-            const res = await fetch('/api/sync', { method: 'POST', headers: {'X-User-Role': 'admin'} });
-            const data = await res.json();
-            alert(data.message);
-            btn.disabled = false; btn.classList.remove('opacity-50');
+            const originalText = btn.innerText;
+            btn.innerText = "⏳ PROCESSING HIGH-CONVICTION...";
+            btn.disabled = true;
+            btn.classList.add("opacity-50", "cursor-not-allowed");
+            
+            try {
+                const res = await fetch('/api/sync', { method: 'POST', headers: {'X-User-Role': 'admin'} });
+                const data = await res.json();
+                alert(data.message);
+            } catch (error) {
+                alert("Sync Failed: " + error);
+            }
+            
+            btn.innerText = originalText;
+            btn.disabled = false;
+            btn.classList.remove("opacity-50", "cursor-not-allowed");
             loadAnalytics();
         }
     </script>
