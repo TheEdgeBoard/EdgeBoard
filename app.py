@@ -14,8 +14,8 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 
 # --- CONFIGURATION ---
 # Replace with your Gmail and the 16-character Google App Password
-EMAIL_ADDRESS = "your-email@gmail.com"
-EMAIL_PASSWORD = "your-app-password" 
+EMAIL_ADDRESS = "edgeboardanalytics@gmail.com"
+EMAIL_PASSWORD = "kxet mzih snlr cqcy" 
 BASE_URL = "https://www.edgeboard.live"
 
 def get_db_connection():
