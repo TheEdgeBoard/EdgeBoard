@@ -1,17 +1,3 @@
-Here is the full, production-ready app.py code.
-
-This version includes:
-
-Split Sync Routes: Separate endpoints for /api/sync/odds (Fast) and /api/sync/stats (Deep Dive).
-
-Safety Checks: Gracefully handles days with no games (like the All-Star break) without crashing.
-
-Authentication: Full login/logout logic for your admin panel.
-
-Email System: Sends verification codes for new users (requires your Gmail App Password).
-
-The Full app.py
-Python
 from flask import Flask, jsonify, request
 import sqlite3
 import os
