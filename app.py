@@ -12,8 +12,8 @@ load_dotenv()
 app = Flask(__name__)
 
 # --- CONFIGURATION ---
-EMAIL_ADDRESS = "your-email@gmail.com"
-EMAIL_PASSWORD = "your-app-password" 
+EMAIL_ADDRESS = "edgeboardanalytics@gmail.com"
+EMAIL_PASSWORD = "13Mizzou!" 
 
 def get_db_connection():
     path = '/home/TheEdgeBoard/EdgeBoard/edgeboard.db'

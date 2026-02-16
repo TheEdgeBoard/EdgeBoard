@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EdgeBoard | Admin Command Center</title>
+    <title>EdgeBoard | Systems</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
@@ -12,6 +12,8 @@
         .glow-emerald { box-shadow: 0 0 20px rgba(16, 185, 129, 0.1); }
         .hidden { display: none; }
         input::placeholder { color: #475569; }
+        .tab-active { background: #10b981 !important; color: white !important; }
+        .tab-inactive { background: #1e293b !important; color: #94a3b8 !important; }
     </style>
 </head>
 <body class="min-h-screen">
@@ -38,56 +40,70 @@
             </div>
         </nav>
 
+        <div id="admin-tabs" class="hidden max-w-7xl mx-auto px-6 mt-6 flex gap-2">
+            <button onclick="switchTab('analytics')" id="tab-analytics" class="orbitron text-[10px] tracking-widest px-6 py-3 rounded-t-lg font-bold transition-all tab-active">
+                SYSTEM ANALYTICS
+            </button>
+            <button onclick="switchTab('management')" id="tab-management" class="orbitron text-[10px] tracking-widest px-6 py-3 rounded-t-lg font-bold transition-all tab-inactive">
+                CLIENT MANAGEMENT
+            </button>
+        </div>
+
         <main class="max-w-7xl mx-auto p-6 space-y-8">
             
-            <section id="admin-onboarding" class="hidden bg-gray-900 p-8 rounded-2xl border border-emerald-500/20 glow-emerald">
-                <h3 class="orbitron text-xs text-emerald-400 mb-6 tracking-widest uppercase">New Client Onboarding</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <input type="text" id="reg-fullname" placeholder="Full Name" class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm outline-none focus:border-emerald-500">
-                    <input type="email" id="reg-email" placeholder="Client Email" class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm outline-none focus:border-emerald-500">
-                    <input type="tel" id="reg-phone" placeholder="Phone (Optional)" class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm outline-none focus:border-emerald-500">
-                    <input type="text" id="reg-username" placeholder="Username" class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm outline-none focus:border-emerald-500 font-bold">
-                    <input type="text" id="reg-password" placeholder="Password" class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm outline-none focus:border-emerald-500">
-                    <button onclick="createNewUser()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg text-xs tracking-widest uppercase">Send Verification Code</button>
-                </div>
-            </section>
+            <div id="section-analytics" class="space-y-6">
+                <section class="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden shadow-2xl">
+                    <table class="w-full text-left">
+                        <thead class="bg-gray-800/50 text-gray-500 text-[10px] uppercase tracking-widest">
+                            <tr>
+                                <th class="p-4">Player</th>
+                                <th class="p-4">Market Line</th>
+                                <th class="p-4 text-center">Projected</th>
+                                <th class="p-4 text-right">Edge</th>
+                            </tr>
+                        </thead>
+                        <tbody id="data-table-body"></tbody>
+                    </table>
+                </section>
+            </div>
 
-            <section id="admin-directory" class="hidden bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden">
-                <div class="p-4 bg-gray-800/50 border-b border-gray-800">
-                    <h3 class="orbitron text-[10px] text-gray-400 tracking-widest uppercase">Active Client Directory</h3>
-                </div>
-                <table class="w-full text-left">
-                    <thead class="text-[10px] text-gray-500 uppercase border-b border-gray-800">
-                        <tr>
-                            <th class="p-4">Name / Contact</th>
-                            <th class="p-4">Credentials</th>
-                            <th class="p-4 text-right">Management</th>
-                        </tr>
-                    </thead>
-                    <tbody id="user-list-body" class="text-sm"></tbody>
-                </table>
-            </section>
+            <div id="section-management" class="hidden space-y-8">
+                <section class="bg-gray-900 p-8 rounded-2xl border border-emerald-500/20 glow-emerald">
+                    <h3 class="orbitron text-xs text-emerald-400 mb-6 tracking-widest uppercase">New Client Onboarding</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <input type="text" id="reg-fullname" placeholder="Full Name" class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm outline-none focus:border-emerald-500">
+                        <input type="email" id="reg-email" placeholder="Client Email" class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm outline-none focus:border-emerald-500">
+                        <input type="text" id="reg-username" placeholder="Username" class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm outline-none focus:border-emerald-500 font-bold">
+                        <input type="text" id="reg-password" placeholder="Password" class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm outline-none focus:border-emerald-500">
+                        <input type="text" id="reg-phone" placeholder="Phone (Optional)" class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm outline-none focus:border-emerald-500">
+                        <button onclick="createNewUser()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg text-xs tracking-widest uppercase">Send Verification Code</button>
+                    </div>
+                </section>
 
-            <section class="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden shadow-2xl">
-                <table class="w-full text-left">
-                    <thead class="bg-gray-800/50 text-gray-500 text-[10px] uppercase tracking-widest">
-                        <tr>
-                            <th class="p-4">Player</th>
-                            <th class="p-4">Market Line</th>
-                            <th class="p-4">Projected</th>
-                            <th class="p-4 text-right">Edge</th>
-                        </tr>
-                    </thead>
-                    <tbody id="data-table-body"></tbody>
-                </table>
-            </section>
+                <section class="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden shadow-2xl">
+                    <div class="p-4 bg-gray-800/50 border-b border-gray-800 flex justify-between items-center">
+                        <h3 class="orbitron text-[10px] text-emerald-400 tracking-widest uppercase font-bold">Client Directory</h3>
+                        <button onclick="loadUserList()" class="text-[10px] text-gray-500 hover:text-white uppercase">Refresh</button>
+                    </div>
+                    <table class="w-full text-left">
+                        <thead class="text-[10px] text-gray-500 uppercase border-b border-gray-800">
+                            <tr>
+                                <th class="p-4">Name / Contact</th>
+                                <th class="p-4">Credentials</th>
+                                <th class="p-4 text-right">Management</th>
+                            </tr>
+                        </thead>
+                        <tbody id="user-list-body" class="text-sm"></tbody>
+                    </table>
+                </section>
+            </div>
         </main>
     </div>
 
     <div id="verify-modal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
         <div class="bg-gray-900 p-8 rounded-2xl border border-emerald-500 w-full max-w-sm shadow-[0_0_50px_rgba(16,185,129,0.2)]">
-            <h2 class="orbitron text-xl font-bold mb-2 text-center text-white">Security Code</h2>
-            <p class="text-gray-400 text-center text-sm mb-6">Check the client's email for the 6-digit activation code.</p>
+            <h2 class="orbitron text-xl font-bold mb-2 text-center text-white text-emerald-400">Verify Email</h2>
+            <p class="text-gray-400 text-center text-sm mb-6">Enter the 6-digit code sent to the client's email.</p>
             <input type="text" id="verify-code" maxlength="6" class="w-full bg-gray-800 border-2 border-emerald-500/50 p-4 text-center text-3xl tracking-[0.5em] rounded-xl text-emerald-400 font-bold mb-6 outline-none focus:border-emerald-500 transition-all" placeholder="000000">
             <button onclick="confirmCode()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl shadow-lg transition-all">ACTIVATE ACCOUNT</button>
             <button onclick="document.getElementById('verify-modal').classList.add('hidden')" class="w-full mt-4 text-gray-500 text-xs uppercase font-bold">Cancel</button>
@@ -95,7 +111,28 @@
     </div>
 
     <script>
-        // --- AUTH ---
+        // --- TAB NAVIGATION LOGIC ---
+        function switchTab(tabName) {
+            const aSec = document.getElementById('section-analytics');
+            const mSec = document.getElementById('section-management');
+            const aBtn = document.getElementById('tab-analytics');
+            const mBtn = document.getElementById('tab-management');
+
+            if (tabName === 'analytics') {
+                aSec.classList.remove('hidden');
+                mSec.classList.add('hidden');
+                aBtn.classList.add('tab-active'); aBtn.classList.remove('tab-inactive');
+                mBtn.classList.add('tab-inactive'); mBtn.classList.remove('tab-active');
+            } else {
+                aSec.classList.add('hidden');
+                mSec.classList.remove('hidden');
+                mBtn.classList.add('tab-active'); mBtn.classList.remove('tab-inactive');
+                aBtn.classList.add('tab-inactive'); aBtn.classList.remove('tab-active');
+                loadUserList(); // Refresh list when entering management
+            }
+        }
+
+        // --- AUTH & INITIALIZATION ---
         async function handleLogin() {
             const user = document.getElementById('username').value;
             const pass = document.getElementById('password').value;
@@ -112,32 +149,30 @@
                 document.getElementById('dashboard-view').classList.remove('hidden');
                 setupUI(data.role, data.username);
                 loadAnalytics();
-            } else { alert("Login Failed"); }
+            } else { alert("Initialization Failure: Invalid Credentials"); }
         }
 
         function setupUI(role, name) {
             document.getElementById('user-badge').innerText = `${name} | ${role}`;
             if (role === 'admin') {
-                document.getElementById('admin-onboarding').classList.remove('hidden');
-                document.getElementById('admin-directory').classList.remove('hidden');
+                document.getElementById('admin-tabs').classList.remove('hidden');
                 document.getElementById('admin-sync-btn').classList.remove('hidden');
-                loadUserList();
             }
         }
 
-        // --- CRM ACTIONS ---
+        // --- CRM LOGIC ---
         async function createNewUser() {
             const payload = {
                 full_name: document.getElementById('reg-fullname').value,
                 email: document.getElementById('reg-email').value,
-                phone: document.getElementById('reg-phone').value,
                 username: document.getElementById('reg-username').value,
-                password: document.getElementById('reg-password').value
+                password: document.getElementById('reg-password').value,
+                phone: document.getElementById('reg-phone').value
             };
             sessionStorage.setItem('pendingUser', payload.username);
             const res = await fetch('/api/create-user', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-User-Role': sessionStorage.getItem('userRole')},
+                headers: {'Content-Type': 'application/json', 'X-User-Role': 'admin'},
                 body: JSON.stringify(payload)
             });
             const data = await res.json();
@@ -155,7 +190,7 @@
             });
             const data = await res.json();
             if (data.status === 'success') {
-                alert("Client Verified!");
+                alert("Account Activated!");
                 location.reload();
             } else alert(data.message);
         }
@@ -168,34 +203,48 @@
                 <tr class="border-b border-gray-800 hover:bg-gray-800/30 transition-all">
                     <td class="p-4">
                         <div class="font-bold text-white">${u.full_name}</div>
-                        <div class="text-xs text-gray-500">${u.email} | ${u.phone}</div>
+                        <div class="text-[10px] text-gray-500">${u.email} | ${u.phone}</div>
                     </td>
-                    <td class="p-4 font-mono text-emerald-500 text-xs">${u.username} / ${u.password}</td>
-                    <td class="p-4 text-right">
-                        <button onclick="deleteUser('${u.username}')" class="text-red-500 text-[10px] font-bold uppercase tracking-tighter">Revoke</button>
+                    <td class="p-4">
+                        <div class="text-xs text-emerald-500 font-mono">${u.username} / ${u.password}</div>
+                    </td>
+                    <td class="p-4 text-right space-x-3">
+                        <button onclick="changePassword('${u.username}')" class="text-emerald-500 text-[10px] font-bold uppercase">Edit</button>
+                        <button onclick="deleteUser('${u.username}')" class="text-red-500 text-[10px] font-bold uppercase">Revoke</button>
                     </td>
                 </tr>
             `).join('');
         }
 
-        async function deleteUser(user) {
-            if (!confirm(`Revoke access for ${user}?`)) return;
-            await fetch(`/api/delete-user/${user}`, { 
-                method: 'DELETE', 
-                headers: {'X-User-Role': 'admin'} 
+        async function changePassword(user) {
+            const newPass = prompt(`New password for ${user}:`);
+            if (!newPass) return;
+            await fetch('/api/update-user', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-User-Role': 'admin'},
+                body: JSON.stringify({username: user, new_password: newPass})
             });
             loadUserList();
         }
 
-        // --- DATA ---
+        async function deleteUser(user) {
+            if (!confirm(`Revoke access for ${user}?`)) return;
+            await fetch(`/api/delete-user/${user}`, { method: 'DELETE', headers: {'X-User-Role': 'admin'} });
+            loadUserList();
+        }
+
+        // --- ANALYTICS DATA ---
         async function loadAnalytics() {
             const res = await fetch('/api/data');
             const data = await res.json();
             document.getElementById('data-table-body').innerHTML = data.map(d => `
                 <tr class="border-b border-gray-800 hover:bg-gray-800/20">
-                    <td class="p-4"><div class="font-bold">${d.player_name}</div><div class="text-[10px] text-gray-500">${d.team}</div></td>
+                    <td class="p-4">
+                        <div class="font-bold">${d.player_name}</div>
+                        <div class="text-[10px] text-gray-500">${d.team}</div>
+                    </td>
                     <td class="p-4 text-xs text-gray-400">${d.line_value} ${d.prop_type}</td>
-                    <td class="p-4 text-emerald-400 font-bold">${d.projected_value}</td>
+                    <td class="p-4 text-emerald-400 font-bold text-center">${d.projected_value}</td>
                     <td class="p-4 text-right font-bold ${d.ev_edge > 5 ? 'text-emerald-500' : 'text-yellow-500'}">${d.ev_edge}%</td>
                 </tr>
             `).join('');
@@ -203,9 +252,12 @@
 
         async function triggerSync() {
             const btn = document.getElementById('admin-sync-btn');
+            const originalText = btn.innerText;
             btn.innerText = "⏳ SYNCING...";
-            await fetch('/api/sync', { method: 'POST', headers: {'X-User-Role': 'admin'} });
-            btn.innerText = "🔄 SYNC DATA";
+            const res = await fetch('/api/sync', { method: 'POST', headers: {'X-User-Role': 'admin'} });
+            const data = await res.json();
+            alert(data.message);
+            btn.innerText = originalText;
             loadAnalytics();
         }
     </script>
