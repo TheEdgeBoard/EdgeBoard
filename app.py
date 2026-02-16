@@ -7,21 +7,21 @@ import smtplib
 from email.mime.text import MIMEText
 from dotenv import load_dotenv
 
-# Load environment variables (like API Keys)
+# Load environment variables
 load_dotenv()
 
 app = Flask(__name__)
 
-# --- CONFIGURATION (UPDATE THESE!) ---
-# Use a Google "App Password", not your regular Gmail password.
+# --- CONFIGURATION ---
+# IMPORTANT: Use a Google "App Password" here, not your login password.
 EMAIL_ADDRESS = "your-email@gmail.com"
 EMAIL_PASSWORD = "your-app-password" 
 
 # --- DATABASE HELPER ---
 def get_db_connection():
-    """Maintains connection to the database based on your specific folder structure."""
+    """Points to the specific path on PythonAnywhere."""
     path = '/home/TheEdgeBoard/EdgeBoard/edgeboard.db'
-    # Fallback for local testing
+    # Fallback for local development
     if not os.path.exists(path):
         path = 'edgeboard.db'
     
@@ -31,8 +31,8 @@ def get_db_connection():
 
 # --- EMAIL ENGINE ---
 def send_code(target_email, code):
-    """Sends a 6-digit verification code via Gmail SMTP."""
-    msg = MIMEText(f"Your EdgeBoard activation code is: {code}\n\nThis code will finalize your account creation.")
+    """Sends 6-digit verification codes via Gmail."""
+    msg = MIMEText(f"Your EdgeBoard activation code is: {code}")
     msg['Subject'] = 'EdgeBoard Access Code'
     msg['From'] = EMAIL_ADDRESS
     msg['To'] = target_email
@@ -44,11 +44,11 @@ def send_code(target_email, code):
 # --- WEB ROUTES ---
 @app.route('/')
 def home():
-    """Serves the dashboard HTML file."""
+    """Serves your dashboard."""
     base_dir = os.path.dirname(os.path.abspath(__file__))
     return open(os.path.join(base_dir, 'index.html'), encoding='utf-8').read()
 
-# --- AUTHENTICATION API ---
+# --- AUTHENTICATION ---
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.json
@@ -56,16 +56,16 @@ def login():
     user = conn.execute('SELECT * FROM users WHERE username = ? AND password = ?',
                         (data['username'], data['password'])).fetchone()
     conn.close()
+    
     if user:
         return jsonify({
             "status": "success", 
             "role": user['role'], 
-            "username": user['username'],
-            "full_name": user.get('full_name')
+            "username": user['username']
         })
     return jsonify({"status": "error", "message": "Invalid Credentials"}), 401
 
-# --- CRM: ONBOARDING (PENDING STATE) ---
+# --- CRM: ONBOARDING ---
 @app.route('/api/create-user', methods=['POST'])
 def create_user():
     if request.headers.get('X-User-Role') != 'admin':
@@ -85,11 +85,11 @@ def create_user():
 
     try:
         send_code(data['email'], code)
-        return jsonify({"status": "pending", "message": "Verification code sent to email."})
+        return jsonify({"status": "pending", "message": "Code sent to email."})
     except Exception as e:
-        return jsonify({"status": "error", "message": f"Email Error: {str(e)}"})
+        return jsonify({"status": "error", "message": f"Email failed: {str(e)}"})
 
-# --- CRM: VERIFICATION (FINAL ACTIVATION) ---
+# --- CRM: VERIFICATION ---
 @app.route('/api/verify-code', methods=['POST'])
 def verify_code():
     data = request.json
@@ -107,53 +107,51 @@ def verify_code():
         conn.close()
         return jsonify({"status": "success", "message": "Account Activated!"})
     
-    return jsonify({"status": "error", "message": "Invalid Verification Code"}), 400
+    return jsonify({"status": "error", "message": "Invalid Code"}), 400
 
-# --- CRM: USER DIRECTORY MANAGEMENT ---
+# --- CRM: USER MANAGEMENT (VIEW / EDIT / DELETE) ---
 @app.route('/api/get-users', methods=['GET'])
 def get_users():
     if request.headers.get('X-User-Role') != 'admin':
         return jsonify({"status": "error"}), 403
-
     conn = get_db_connection()
     users = conn.execute('SELECT username, password, full_name, email, phone FROM users WHERE role = "viewer"').fetchall()
     conn.close()
     return jsonify([dict(row) for row in users])
 
+@app.route('/api/update-user', methods=['POST'])
+def update_user():
+    if request.headers.get('X-User-Role') != 'admin':
+        return jsonify({"status": "error"}), 403
+    data = request.json
+    conn = get_db_connection()
+    conn.execute('UPDATE users SET password = ? WHERE username = ?', (data['new_password'], data['username']))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "message": "Password updated."})
+
 @app.route('/api/delete-user/<username>', methods=['DELETE'])
 def delete_user(username):
     if request.headers.get('X-User-Role') != 'admin':
         return jsonify({"status": "error"}), 403
-
     conn = get_db_connection()
     conn.execute('DELETE FROM users WHERE username = ?', (username,))
     conn.commit()
     conn.close()
-    return jsonify({"status": "success", "message": f"Access revoked for {username}"})
+    return jsonify({"status": "success", "message": f"User {username} deleted."})
 
-# --- DATA ENGINE API ---
+# --- DATA & SYNC ---
 @app.route('/api/data')
 def get_data():
     conn = get_db_connection()
-    # Simplified query - ensure your sim_results table exists
     rows = conn.execute('SELECT * FROM sim_results ORDER BY ev_edge DESC').fetchall()
     conn.close()
     return jsonify([dict(row) for row in rows])
 
-# --- SYSTEM SYNC (ADMIN ONLY) ---
 @app.route('/api/sync', methods=['POST'])
 def manual_sync():
     if request.headers.get('X-User-Role') != 'admin':
         return jsonify({"status": "error"}), 403
-
     try:
-        # Note: Ensure these paths match your EdgeBoard folder structure
         subprocess.run(["python", "/home/TheEdgeBoard/EdgeBoard/sync_odds.py"], check=True)
-        subprocess.run(["python", "/home/TheEdgeBoard/EdgeBoard/sync_stats.py"], check=True)
-        subprocess.run(["python", "/home/TheEdgeBoard/EdgeBoard/run_sims.py"], check=True)
-        return jsonify({"status": "success", "message": "Global Market Refresh Complete."})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)})
-
-if __name__ == '__main__':
-    app.run(debug=True)
+        subprocess.run(["python", "/home
