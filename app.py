@@ -1,3 +1,17 @@
+Here is the full, production-ready app.py code.
+
+This version includes:
+
+Split Sync Routes: Separate endpoints for /api/sync/odds (Fast) and /api/sync/stats (Deep Dive).
+
+Safety Checks: Gracefully handles days with no games (like the All-Star break) without crashing.
+
+Authentication: Full login/logout logic for your admin panel.
+
+Email System: Sends verification codes for new users (requires your Gmail App Password).
+
+The Full app.py
+Python
 from flask import Flask, jsonify, request
 import sqlite3
 import os
@@ -7,21 +21,25 @@ import smtplib
 from email.mime.text import MIMEText
 from dotenv import load_dotenv
 
-# Load environment variables (for .env support)
+# Load environment variables (for local testing support)
 load_dotenv()
 
 app = Flask(__name__)
 
 # --- CONFIGURATION ---
 # IMPORTANT: Use your 16-character Google App Password here
-EMAIL_ADDRESS = "edgeboardanalytics@gmail.com"
-EMAIL_PASSWORD = "kxet mzih snlr cqcy" 
+# Replace with your actual credentials or load from os.environ
+EMAIL_ADDRESS = "your-email@gmail.com"
+EMAIL_PASSWORD = "your-app-password" 
 
 def get_db_connection():
     """Points to the specific path on PythonAnywhere."""
+    # Production path on PythonAnywhere
     path = '/home/TheEdgeBoard/EdgeBoard/edgeboard.db'
-    if not os.path.exists(path):
-        path = 'edgeboard.db' # Fallback for local testing
+    # Fallback for local testing if production path doesn't exist
+    if not os.path.exists('/home/TheEdgeBoard/EdgeBoard/'):
+        path = 'edgeboard.db'
+        
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     return conn
@@ -124,37 +142,28 @@ def delete_user(username):
     conn.close()
     return jsonify({"status": "success", "message": f"User {username} deleted."})
 
-# --- DATA & ANALYTICS: HIGH-CONVICTION OUTPUT ---
+# --- DATA & ANALYTICS: MULTI-SIM OUTPUT ---
 @app.route('/api/data')
 def get_data():
     conn = get_db_connection()
-    # Updated Query: Selects suggestion (Over/Under) and win_rate for the new UI
-    rows = conn.execute('''
-        SELECT player_name, team, prop_type, line_value, suggestion, projected_value, ev_edge, win_rate, context_tags 
-        FROM sim_results 
-        ORDER BY ev_edge DESC
-    ''').fetchall()
+    # Selects all 4 simulation windows (3, 5, 10, 14) to send to frontend
+    rows = conn.execute('SELECT * FROM sim_results ORDER BY ev_10 DESC').fetchall()
     conn.close()
     return jsonify([dict(row) for row in rows])
 
-# --- SYSTEM SYNC: THE INTELLIGENCE PIPELINE ---
-@app.route('/api/sync', methods=['POST'])
-def manual_sync():
-    """
-    Runs the full intelligence pipeline in the strict logical order required 
-    for High-Conviction filtering (4/6 Hits + 60% Sim Win Rate).
-    Handles "No Games Scheduled" gracefully.
-    """
+# --- SYSTEM SYNC ROUTES ---
+
+@app.route('/api/sync/odds', methods=['POST'])
+def sync_odds_only():
+    """Step 1: Just fetch the latest lines (Fast)."""
     if request.headers.get('X-User-Role') != 'admin':
         return jsonify({"status": "error"}), 403
     
     base_path = "/home/TheEdgeBoard/EdgeBoard/"
-    # For local testing, remove the base_path prefix if needed
-    if not os.path.exists(base_path): base_path = ""
+    if not os.path.exists(base_path): base_path = "" # Local fallback
 
     try:
-        # 1. MARKET DATA: Fetch fresh lines
-        # capture_output=True allows us to read what sync_odds.py prints
+        # Capture output to check for "No games" message
         result = subprocess.run(
             ["python3", os.path.join(base_path, "sync_odds.py")], 
             check=True, 
@@ -162,33 +171,49 @@ def manual_sync():
             text=True
         )
         
-        # Check standard output for the "No games" message we added to sync_odds.py
+        # Check standard output for the "No games" message
         if "No games scheduled" in result.stdout:
             return jsonify({
                 "status": "warning", 
                 "message": "No NBA games scheduled today (All-Star/Offseason)."
             })
-
-        # 2. PERFORMANCE DATA: Calc 4/6 consistency
-        subprocess.run(["python3", os.path.join(base_path, "sync_stats.py")], check=True)
-        
-        # 3. CONTEXT DATA: Fetch Opponent Pace/Defense ranks and Injury Reports
-        subprocess.run(["python3", os.path.join(base_path, "sync_matchups.py")], check=True)
-        subprocess.run(["python3", os.path.join(base_path, "sync_injuries.py")], check=True)
-        
-        # 4. SIMULATION ENGINE: Run Monte Carlo with 60% Win Rate Threshold
-        subprocess.run(["python3", os.path.join(base_path, "run_sims.py")], check=True)
-        
-        return jsonify({"status": "success", "message": "High-Conviction Sync Complete."})
+            
+        return jsonify({"status": "success", "message": "Odds Synced Successfully."})
 
     except subprocess.CalledProcessError as e:
-        # If any script crashes (returns non-zero exit code)
-        # stderr contains the error message from the crashed script
         error_msg = e.stderr if e.stderr else str(e)
-        return jsonify({"status": "error", "message": f"Pipeline Error: {error_msg}"})
-        
+        return jsonify({"status": "error", "message": f"Odds Sync Error: {error_msg}"})
     except Exception as e:
-        return jsonify({"status": "error", "message": f"Server Error: {str(e)}"})
+        return jsonify({"status": "error", "message": str(e)})
+
+@app.route('/api/sync/stats', methods=['POST'])
+def sync_stats_only():
+    """Step 2: Fetch deep history & Run Multi-Sims (Slow)."""
+    if request.headers.get('X-User-Role') != 'admin':
+        return jsonify({"status": "error"}), 403
+    
+    base_path = "/home/TheEdgeBoard/EdgeBoard/"
+    if not os.path.exists(base_path): base_path = "" # Local fallback
+
+    try:
+        # 1. Performance Data (3/5/10/14 Games)
+        subprocess.run(["python3", os.path.join(base_path, "sync_stats.py")], check=True)
+        
+        # 2. Matchup Context (Pace/Defense)
+        subprocess.run(["python3", os.path.join(base_path, "sync_matchups.py")], check=True)
+        
+        # 3. Injury Reports
+        subprocess.run(["python3", os.path.join(base_path, "sync_injuries.py")], check=True)
+        
+        # 4. Multi-Window Simulations (Calculates EV for all 4 windows)
+        subprocess.run(["python3", os.path.join(base_path, "run_sims.py")], check=True)
+        
+        return jsonify({"status": "success", "message": "Multi-Window Stats & Sims Complete."})
+
+    except subprocess.CalledProcessError as e:
+        return jsonify({"status": "error", "message": f"Stats Pipeline Error: {str(e)}"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
 
 if __name__ == '__main__':
     app.run(debug=True)
