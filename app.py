@@ -7,15 +7,18 @@ import smtplib
 from email.mime.text import MIMEText
 from dotenv import load_dotenv
 
+# Load environment variables for security (Optional but recommended)
 load_dotenv()
 
 app = Flask(__name__)
 
 # --- CONFIGURATION ---
+# Replace with your Gmail and the 16-character Google App Password
 EMAIL_ADDRESS = "edgeboardanalytics@gmail.com"
 EMAIL_PASSWORD = "gqkj rmid vwci tezp" 
 
 def get_db_connection():
+    """Connects to the SQLite database on PythonAnywhere."""
     path = '/home/TheEdgeBoard/EdgeBoard/edgeboard.db'
     if not os.path.exists(path):
         path = 'edgeboard.db'
@@ -24,19 +27,26 @@ def get_db_connection():
     return conn
 
 def send_code(target_email, code):
+    """Sends 6-digit verification codes via Gmail SMTP."""
     msg = MIMEText(f"Your EdgeBoard activation code is: {code}")
     msg['Subject'] = 'EdgeBoard Access Code'
     msg['From'] = EMAIL_ADDRESS
     msg['To'] = target_email
-    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-        smtp.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
-        smtp.send_message(msg)
+    try:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+            smtp.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
+            smtp.send_message(msg)
+    except Exception as e:
+        print(f"SMTP Error: {e}")
 
+# --- PRIMARY WEB ROUTES ---
 @app.route('/')
 def home():
+    """Serves the main dashboard (index.html)."""
     base_dir = os.path.dirname(os.path.abspath(__file__))
     return open(os.path.join(base_dir, 'index.html'), encoding='utf-8').read()
 
+# --- AUTHENTICATION ENGINE ---
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.json
@@ -45,15 +55,22 @@ def login():
                         (data['username'], data['password'])).fetchone()
     conn.close()
     if user:
-        return jsonify({"status": "success", "role": user['role'], "username": user['username']})
+        return jsonify({
+            "status": "success", 
+            "role": user['role'], 
+            "username": user['username']
+        })
     return jsonify({"status": "error", "message": "Invalid Credentials"}), 401
 
+# --- CRM & CLIENT MANAGEMENT ---
 @app.route('/api/create-user', methods=['POST'])
 def create_user():
     if request.headers.get('X-User-Role') != 'admin':
         return jsonify({"status": "error"}), 403
+    
     data = request.json
     code = str(random.randint(100000, 999999))
+    
     conn = get_db_connection()
     conn.execute('''INSERT OR REPLACE INTO pending_users 
                     (username, password, role, full_name, phone, email, code) 
@@ -62,6 +79,7 @@ def create_user():
                  data['full_name'], data['phone'], data['email'], code))
     conn.commit()
     conn.close()
+    
     try:
         send_code(data['email'], code)
         return jsonify({"status": "pending", "message": "Code sent to email."})
@@ -94,17 +112,6 @@ def get_users():
     conn.close()
     return jsonify([dict(row) for row in users])
 
-@app.route('/api/update-user', methods=['POST'])
-def update_user():
-    if request.headers.get('X-User-Role') != 'admin':
-        return jsonify({"status": "error"}), 403
-    data = request.json
-    conn = get_db_connection()
-    conn.execute('UPDATE users SET password = ? WHERE username = ?', (data['new_password'], data['username']))
-    conn.commit()
-    conn.close()
-    return jsonify({"status": "success", "message": "Password updated."})
-
 @app.route('/api/delete-user/<username>', methods=['DELETE'])
 def delete_user(username):
     if request.headers.get('X-User-Role') != 'admin':
@@ -115,23 +122,42 @@ def delete_user(username):
     conn.close()
     return jsonify({"status": "success", "message": f"User {username} deleted."})
 
+# --- DATA ANALYTICS (Monte Carlo Output) ---
 @app.route('/api/data')
 def get_data():
     conn = get_db_connection()
-    rows = conn.execute('SELECT * FROM sim_results ORDER BY ev_edge DESC').fetchall()
+    # Grabs sorted positive edges with our new context tags (🔥, 🏎️, etc.)
+    rows = conn.execute('''
+        SELECT player_name, team, prop_type, line_value, projected_value, ev_edge, context_tags 
+        FROM sim_results 
+        WHERE ev_edge >= 0 
+        ORDER BY ev_edge DESC
+    ''').fetchall()
     conn.close()
     return jsonify([dict(row) for row in rows])
 
+# --- CONTEXTUAL SYNC CHAIN ---
 @app.route('/api/sync', methods=['POST'])
 def manual_sync():
+    """
+    Orchestrates the Contextual Monte Carlo Chain:
+    1. Matchup Data (Defense/Pace)
+    2. Injury Data (Usage Adjustments)
+    3. Simulation Execution (10k Iterations)
+    """
     if request.headers.get('X-User-Role') != 'admin':
         return jsonify({"status": "error"}), 403
     try:
-        # Paths updated for your specific project folder structure
-        subprocess.run(["python3", "/home/TheEdgeBoard/EdgeBoard/sync_odds.py"], check=True)
-        subprocess.run(["python3", "/home/TheEdgeBoard/EdgeBoard/sync_stats.py"], check=True)
+        # Step 1: Opponent Defense & Pace
+        subprocess.run(["python3", "/home/TheEdgeBoard/EdgeBoard/sync_matchups.py"], check=True)
+        
+        # Step 2: Injury Report Check
+        subprocess.run(["python3", "/home/TheEdgeBoard/EdgeBoard/sync_injuries.py"], check=True)
+        
+        # Step 3: Weighted Monte Carlo Sims
         subprocess.run(["python3", "/home/TheEdgeBoard/EdgeBoard/run_sims.py"], check=True)
-        return jsonify({"status": "success", "message": "Sync Complete."})
+        
+        return jsonify({"status": "success", "message": "Intelligence Chain Complete. View the dashboard for new Edges."})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
 

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EdgeBoard | Systems</title>
+    <title>EdgeBoard | Intel Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
@@ -12,8 +12,9 @@
         .glow-emerald { box-shadow: 0 0 20px rgba(16, 185, 129, 0.1); }
         .hidden { display: none; }
         input::placeholder { color: #475569; }
-        .tab-active { background: #10b981 !important; color: white !important; }
+        .tab-active { background: #10b981 !important; color: white !important; border-bottom: 3px solid #059669; }
         .tab-inactive { background: #1e293b !important; color: #94a3b8 !important; }
+        .tier-max { text-shadow: 0 0 10px rgba(52, 211, 153, 0.6); }
     </style>
 </head>
 <body class="min-h-screen">
@@ -24,7 +25,7 @@
             <div class="space-y-4">
                 <input type="text" id="username" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:border-emerald-500 outline-none" placeholder="Operator ID">
                 <input type="password" id="password" class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-white focus:border-emerald-500 outline-none" placeholder="Access Code">
-                <button onclick="handleLogin()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg transition-all">INITIALIZE</button>
+                <button onclick="handleLogin()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg transition-all">INITIALIZE SYSTEM</button>
             </div>
         </div>
     </div>
@@ -34,7 +35,9 @@
             <div class="max-w-7xl mx-auto flex justify-between items-center">
                 <h1 class="orbitron text-xl font-bold text-emerald-400">EDGEBOARD <span class="text-[10px] text-gray-500 ml-2 uppercase" id="user-badge"></span></h1>
                 <div class="flex gap-4">
-                    <button id="admin-sync-btn" onclick="triggerSync()" class="hidden bg-emerald-600/10 text-emerald-400 text-xs font-bold px-4 py-2 rounded border border-emerald-500/30">🔄 SYNC DATA</button>
+                    <button id="admin-sync-btn" onclick="triggerSync()" class="hidden bg-emerald-600/10 text-emerald-400 text-xs font-bold px-4 py-2 rounded border border-emerald-500/30 transition-all">
+                        <span id="sync-text">🔄 CONTEXTUAL SYNC</span>
+                    </button>
                     <button onclick="location.reload()" class="text-gray-500 hover:text-white text-xs font-bold uppercase">Logout</button>
                 </div>
             </div>
@@ -54,12 +57,12 @@
             <div id="section-analytics" class="space-y-6">
                 <section class="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden shadow-2xl">
                     <table class="w-full text-left">
-                        <thead class="bg-gray-800/50 text-gray-500 text-[10px] uppercase tracking-widest">
+                        <thead class="bg-gray-800/50 text-gray-500 text-[10px] uppercase tracking-widest border-b border-gray-800">
                             <tr>
-                                <th class="p-4">Player</th>
+                                <th class="p-4">Player / Context</th>
                                 <th class="p-4">Market Line</th>
-                                <th class="p-4 text-center">Projected</th>
-                                <th class="p-4 text-right">Edge</th>
+                                <th class="p-4 text-center">Projected μ</th>
+                                <th class="p-4 text-right">EV Edge</th>
                             </tr>
                         </thead>
                         <tbody id="data-table-body"></tbody>
@@ -69,28 +72,27 @@
 
             <div id="section-management" class="hidden space-y-8">
                 <section class="bg-gray-900 p-8 rounded-2xl border border-emerald-500/20 glow-emerald">
-                    <h3 class="orbitron text-xs text-emerald-400 mb-6 tracking-widest uppercase">New Client Onboarding</h3>
+                    <h3 class="orbitron text-xs text-emerald-400 mb-6 tracking-widest uppercase font-bold">New Client Onboarding</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <input type="text" id="reg-fullname" placeholder="Full Name" class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm outline-none focus:border-emerald-500">
                         <input type="email" id="reg-email" placeholder="Client Email" class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm outline-none focus:border-emerald-500">
                         <input type="text" id="reg-username" placeholder="Username" class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm outline-none focus:border-emerald-500 font-bold">
                         <input type="text" id="reg-password" placeholder="Password" class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm outline-none focus:border-emerald-500">
-                        <input type="text" id="reg-phone" placeholder="Phone (Optional)" class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm outline-none focus:border-emerald-500">
-                        <button onclick="createNewUser()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg text-xs tracking-widest uppercase">Send Verification Code</button>
+                        <input type="text" id="reg-phone" placeholder="Phone" class="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm outline-none focus:border-emerald-500">
+                        <button onclick="createNewUser()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg text-xs tracking-widest uppercase">Send Verification</button>
                     </div>
                 </section>
 
                 <section class="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden shadow-2xl">
-                    <div class="p-4 bg-gray-800/50 border-b border-gray-800 flex justify-between items-center">
-                        <h3 class="orbitron text-[10px] text-emerald-400 tracking-widest uppercase font-bold">Client Directory</h3>
-                        <button onclick="loadUserList()" class="text-[10px] text-gray-500 hover:text-white uppercase">Refresh</button>
+                    <div class="p-4 bg-gray-800/50 border-b border-gray-800">
+                        <h3 class="orbitron text-[10px] text-emerald-400 tracking-widest uppercase font-bold">Active Client Directory</h3>
                     </div>
                     <table class="w-full text-left">
                         <thead class="text-[10px] text-gray-500 uppercase border-b border-gray-800">
                             <tr>
-                                <th class="p-4">Name / Contact</th>
+                                <th class="p-4">Client</th>
                                 <th class="p-4">Credentials</th>
-                                <th class="p-4 text-right">Management</th>
+                                <th class="p-4 text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="user-list-body" class="text-sm"></tbody>
@@ -101,17 +103,16 @@
     </div>
 
     <div id="verify-modal" class="hidden fixed inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div class="bg-gray-900 p-8 rounded-2xl border border-emerald-500 w-full max-w-sm shadow-[0_0_50px_rgba(16,185,129,0.2)]">
-            <h2 class="orbitron text-xl font-bold mb-2 text-center text-white text-emerald-400">Verify Email</h2>
+        <div class="bg-gray-900 p-8 rounded-2xl border border-emerald-500 w-full max-w-sm shadow-2xl">
+            <h2 class="orbitron text-xl font-bold mb-2 text-center text-emerald-400">Security Code</h2>
             <p class="text-gray-400 text-center text-sm mb-6">Enter the 6-digit code sent to the client's email.</p>
-            <input type="text" id="verify-code" maxlength="6" class="w-full bg-gray-800 border-2 border-emerald-500/50 p-4 text-center text-3xl tracking-[0.5em] rounded-xl text-emerald-400 font-bold mb-6 outline-none focus:border-emerald-500 transition-all" placeholder="000000">
-            <button onclick="confirmCode()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl shadow-lg transition-all">ACTIVATE ACCOUNT</button>
-            <button onclick="document.getElementById('verify-modal').classList.add('hidden')" class="w-full mt-4 text-gray-500 text-xs uppercase font-bold">Cancel</button>
+            <input type="text" id="verify-code" maxlength="6" class="w-full bg-gray-800 border-2 border-emerald-500/50 p-4 text-center text-3xl tracking-[0.5em] rounded-xl text-emerald-400 font-bold mb-6 outline-none" placeholder="000000">
+            <button onclick="confirmCode()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl transition-all">ACTIVATE</button>
         </div>
     </div>
 
     <script>
-        // --- TAB NAVIGATION LOGIC ---
+        // --- UI & TAB LOGIC ---
         function switchTab(tabName) {
             const aSec = document.getElementById('section-analytics');
             const mSec = document.getElementById('section-management');
@@ -119,20 +120,18 @@
             const mBtn = document.getElementById('tab-management');
 
             if (tabName === 'analytics') {
-                aSec.classList.remove('hidden');
-                mSec.classList.add('hidden');
+                aSec.classList.remove('hidden'); mSec.classList.add('hidden');
                 aBtn.classList.add('tab-active'); aBtn.classList.remove('tab-inactive');
                 mBtn.classList.add('tab-inactive'); mBtn.classList.remove('tab-active');
             } else {
-                aSec.classList.add('hidden');
-                mSec.classList.remove('hidden');
+                aSec.classList.add('hidden'); mSec.classList.remove('hidden');
                 mBtn.classList.add('tab-active'); mBtn.classList.remove('tab-inactive');
                 aBtn.classList.add('tab-inactive'); aBtn.classList.remove('tab-active');
-                loadUserList(); // Refresh list when entering management
+                loadUserList();
             }
         }
 
-        // --- AUTH & INITIALIZATION ---
+        // --- AUTH & DATA LOADING ---
         async function handleLogin() {
             const user = document.getElementById('username').value;
             const pass = document.getElementById('password').value;
@@ -149,7 +148,7 @@
                 document.getElementById('dashboard-view').classList.remove('hidden');
                 setupUI(data.role, data.username);
                 loadAnalytics();
-            } else { alert("Initialization Failure: Invalid Credentials"); }
+            } else { alert("Login Error: Credentials Rejected."); }
         }
 
         function setupUI(role, name) {
@@ -160,7 +159,34 @@
             }
         }
 
-        // --- CRM LOGIC ---
+        async function loadAnalytics() {
+            const res = await fetch('/api/data');
+            const data = await res.json();
+            document.getElementById('data-table-body').innerHTML = data.map(d => {
+                const edge = parseFloat(d.ev_edge);
+                let colorClass = "text-yellow-500"; 
+                if (edge >= 10) colorClass = "text-emerald-400 tier-max font-black"; 
+                else if (edge >= 6) colorClass = "text-emerald-500 font-bold";
+                else if (edge >= 3) colorClass = "text-green-700 font-semibold";
+
+                return `
+                <tr class="border-b border-gray-800 hover:bg-gray-800/20 transition-all">
+                    <td class="p-4">
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-white">${d.player_name}</span>
+                            <span class="text-xs" title="Context: ${d.context_tags}">${d.context_tags || ''}</span>
+                        </div>
+                        <div class="text-[10px] text-gray-500 uppercase tracking-tighter">${d.team}</div>
+                    </td>
+                    <td class="p-4 text-xs text-gray-400">${d.line_value} ${d.prop_type}</td>
+                    <td class="p-4 text-white font-medium text-center">${d.projected_value}</td>
+                    <td class="p-4 text-right ${colorClass}">${edge.toFixed(2)}%</td>
+                </tr>
+                `;
+            }).join('');
+        }
+
+        // --- CRM ACTIONS ---
         async function createNewUser() {
             const payload = {
                 full_name: document.getElementById('reg-fullname').value,
@@ -175,9 +201,7 @@
                 headers: {'Content-Type': 'application/json', 'X-User-Role': 'admin'},
                 body: JSON.stringify(payload)
             });
-            const data = await res.json();
-            if (data.status === 'pending') document.getElementById('verify-modal').classList.remove('hidden');
-            else alert(data.message);
+            if (res.ok) document.getElementById('verify-modal').classList.remove('hidden');
         }
 
         async function confirmCode() {
@@ -188,77 +212,54 @@
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({username, code})
             });
-            const data = await res.json();
-            if (data.status === 'success') {
-                alert("Account Activated!");
-                location.reload();
-            } else alert(data.message);
+            if (res.ok) { alert("Client Activated."); location.reload(); }
         }
 
         async function loadUserList() {
             const res = await fetch('/api/get-users', { headers: {'X-User-Role': 'admin'} });
             const users = await res.json();
-            const body = document.getElementById('user-list-body');
-            body.innerHTML = users.map(u => `
+            document.getElementById('user-list-body').innerHTML = users.map(u => `
                 <tr class="border-b border-gray-800 hover:bg-gray-800/30 transition-all">
                     <td class="p-4">
                         <div class="font-bold text-white">${u.full_name}</div>
-                        <div class="text-[10px] text-gray-500">${u.email} | ${u.phone}</div>
+                        <div class="text-[10px] text-gray-500">${u.email}</div>
                     </td>
                     <td class="p-4">
                         <div class="text-xs text-emerald-500 font-mono">${u.username} / ${u.password}</div>
                     </td>
-                    <td class="p-4 text-right space-x-3">
-                        <button onclick="changePassword('${u.username}')" class="text-emerald-500 text-[10px] font-bold uppercase">Edit</button>
+                    <td class="p-4 text-right">
                         <button onclick="deleteUser('${u.username}')" class="text-red-500 text-[10px] font-bold uppercase">Revoke</button>
                     </td>
                 </tr>
             `).join('');
         }
 
-        async function changePassword(user) {
-            const newPass = prompt(`New password for ${user}:`);
-            if (!newPass) return;
-            await fetch('/api/update-user', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-User-Role': 'admin'},
-                body: JSON.stringify({username: user, new_password: newPass})
-            });
+        async function deleteUser(username) {
+            if (!confirm(`Revoke access for ${username}?`)) return;
+            await fetch(`/api/delete-user/${username}`, { method: 'DELETE', headers: {'X-User-Role': 'admin'} });
             loadUserList();
         }
 
-        async function deleteUser(user) {
-            if (!confirm(`Revoke access for ${user}?`)) return;
-            await fetch(`/api/delete-user/${user}`, { method: 'DELETE', headers: {'X-User-Role': 'admin'} });
-            loadUserList();
-        }
-
-        // --- ANALYTICS DATA ---
-        async function loadAnalytics() {
-            const res = await fetch('/api/data');
-            const data = await res.json();
-            document.getElementById('data-table-body').innerHTML = data.map(d => `
-                <tr class="border-b border-gray-800 hover:bg-gray-800/20">
-                    <td class="p-4">
-                        <div class="font-bold">${d.player_name}</div>
-                        <div class="text-[10px] text-gray-500">${d.team}</div>
-                    </td>
-                    <td class="p-4 text-xs text-gray-400">${d.line_value} ${d.prop_type}</td>
-                    <td class="p-4 text-emerald-400 font-bold text-center">${d.projected_value}</td>
-                    <td class="p-4 text-right font-bold ${d.ev_edge > 5 ? 'text-emerald-500' : 'text-yellow-500'}">${d.ev_edge}%</td>
-                </tr>
-            `).join('');
-        }
-
+        // --- SYNC ENGINE ---
         async function triggerSync() {
             const btn = document.getElementById('admin-sync-btn');
-            const originalText = btn.innerText;
-            btn.innerText = "⏳ SYNCING...";
-            const res = await fetch('/api/sync', { method: 'POST', headers: {'X-User-Role': 'admin'} });
-            const data = await res.json();
-            alert(data.message);
-            btn.innerText = originalText;
-            loadAnalytics();
+            const text = document.getElementById('sync-text');
+            btn.disabled = true;
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+            text.innerText = "⏳ PROCESSING INTEL...";
+
+            try {
+                const res = await fetch('/api/sync', { method: 'POST', headers: {'X-User-Role': 'admin'} });
+                const data = await res.json();
+                alert(data.message);
+                loadAnalytics();
+            } catch (err) {
+                alert("Sync Failed. Check server logs.");
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                text.innerText = "🔄 CONTEXTUAL SYNC";
+            }
         }
     </script>
 </body>
