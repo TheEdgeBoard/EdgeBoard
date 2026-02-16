@@ -13,7 +13,7 @@ app = Flask(__name__)
 
 # --- CONFIGURATION ---
 EMAIL_ADDRESS = "edgeboardanalytics@gmail.com"
-EMAIL_PASSWORD = "13Mizzou!" 
+EMAIL_PASSWORD = "gqkj rmid vwci tezp" 
 
 def get_db_connection():
     path = '/home/TheEdgeBoard/EdgeBoard/edgeboard.db'
