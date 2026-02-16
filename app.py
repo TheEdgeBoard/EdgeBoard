@@ -7,14 +7,13 @@ import smtplib
 from email.mime.text import MIMEText
 from dotenv import load_dotenv
 
-# Load environment variables for security (if using .env file)
+# Load environment variables (for .env support)
 load_dotenv()
 
 app = Flask(__name__)
 
 # --- CONFIGURATION ---
 # IMPORTANT: Use your 16-character Google App Password here
-# Replace with your actual credentials or load from os.environ
 EMAIL_ADDRESS = "edgeboardanalytics@gmail.com"
 EMAIL_PASSWORD = "kxet mzih snlr cqcy" 
 
@@ -144,6 +143,7 @@ def manual_sync():
     """
     Runs the full intelligence pipeline in the strict logical order required 
     for High-Conviction filtering (4/6 Hits + 60% Sim Win Rate).
+    Handles "No Games Scheduled" gracefully.
     """
     if request.headers.get('X-User-Role') != 'admin':
         return jsonify({"status": "error"}), 403
@@ -153,10 +153,23 @@ def manual_sync():
     if not os.path.exists(base_path): base_path = ""
 
     try:
-        # 1. MARKET DATA: Fetch fresh lines for all 9 categories (PTS, REB, AST, 3PM, FGA, etc.)
-        subprocess.run(["python3", os.path.join(base_path, "sync_odds.py")], check=True)
+        # 1. MARKET DATA: Fetch fresh lines
+        # capture_output=True allows us to read what sync_odds.py prints
+        result = subprocess.run(
+            ["python3", os.path.join(base_path, "sync_odds.py")], 
+            check=True, 
+            capture_output=True, 
+            text=True
+        )
         
-        # 2. PERFORMANCE DATA: Calc 4/6 consistency and Last Game hit/miss against those specific lines
+        # Check standard output for the "No games" message we added to sync_odds.py
+        if "No games scheduled" in result.stdout:
+            return jsonify({
+                "status": "warning", 
+                "message": "No NBA games scheduled today (All-Star/Offseason)."
+            })
+
+        # 2. PERFORMANCE DATA: Calc 4/6 consistency
         subprocess.run(["python3", os.path.join(base_path, "sync_stats.py")], check=True)
         
         # 3. CONTEXT DATA: Fetch Opponent Pace/Defense ranks and Injury Reports
@@ -167,8 +180,15 @@ def manual_sync():
         subprocess.run(["python3", os.path.join(base_path, "run_sims.py")], check=True)
         
         return jsonify({"status": "success", "message": "High-Conviction Sync Complete."})
+
+    except subprocess.CalledProcessError as e:
+        # If any script crashes (returns non-zero exit code)
+        # stderr contains the error message from the crashed script
+        error_msg = e.stderr if e.stderr else str(e)
+        return jsonify({"status": "error", "message": f"Pipeline Error: {error_msg}"})
+        
     except Exception as e:
-        return jsonify({"status": "error", "message": f"Pipeline Error: {str(e)}"})
+        return jsonify({"status": "error", "message": f"Server Error: {str(e)}"})
 
 if __name__ == '__main__':
     app.run(debug=True)
