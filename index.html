@@ -100,130 +100,138 @@
         </div>
     </div>
     <script>
-        async function requestAccess() {
-            const payload = {
-                full_name: document.getElementById('r-name').value,
-                email: document.getElementById('r-email').value,
-                requested_username: document.getElementById('r-user').value // Must match app.py
-            };
-    
+    async function requestAccess() {
+        const payload = {
+            full_name: document.getElementById('r-name').value,
+            email: document.getElementById('r-email').value,
+            requested_username: document.getElementById('r-user').value
+        };
+
+        if(!payload.full_name || !payload.email || !payload.requested_username) {
+            alert("Please fill in all fields.");
+            return;
+        }
+
+        try {
             const res = await fetch('/api/register', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(payload)
             });
-            // ...
-        }
             const data = await res.json();
             alert(data.message);
             if(data.status === 'success') closeModal('reg-modal');
+        } catch (e) {
+            alert("Error connecting to server.");
+        }
+    }
+
+    async function auth(type) {
+        const user = document.getElementById(type === 'login' ? 'l-user' : 'r-user').value;
+        const pass = document.getElementById(type === 'login' ? 'l-pass' : 'r-pass').value;
+        const res = await fetch(`/api/${type}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({username: user, password: pass})
+        });
+        const data = await res.json();
+        if(data.status === 'success') {
+            if(type === 'login') {
+                localStorage.setItem('user', user);
+                localStorage.setItem('role', data.role);
+                location.reload();
+            } else {
+                alert("Registered! Please Sign In.");
+                closeModal('reg-modal');
             }
-        async function auth(type) {
-            const user = document.getElementById(type === 'login' ? 'l-user' : 'r-user').value;
-            const pass = document.getElementById(type === 'login' ? 'l-pass' : 'r-pass').value;
-            const res = await fetch(`/api/${type}`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({username: user, password: pass})
-            });
-            const data = await res.json();
-            if(data.status === 'success') {
-                if(type === 'login') {
-                    localStorage.setItem('user', user);
-                    localStorage.setItem('role', data.role);
-                    location.reload();
-                } else {
-                    alert("Registered! Please Sign In.");
-                    closeModal('reg-modal');
-                }
-            } else { alert(data.message); }
-        }
+        } else { alert(data.message); }
+    }
 
-        function checkAuth() {
-            const user = localStorage.getItem('user');
-            const role = localStorage.getItem('role');
-            if(user) {
-                document.getElementById('login-gate').classList.add('hidden');
-                document.getElementById('dashboard-content').classList.remove('hidden');
-                document.getElementById('logout-btn').classList.remove('hidden');
-                document.getElementById('display-user').innerText = user;
-                if(role === 'admin') {
-                    document.getElementById('btn-users-tab').classList.remove('hidden');
-                    loadUsers();
-                }
-                loadData();
-            }
-        }
-
-        function showTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
-            document.getElementById('btn-' + tabId).classList.add('active');
-        }
-
-        async function loadData() {
-            const res = await fetch('/api/data');
-            const data = await res.json();
-            const body = document.getElementById('table-body');
-            body.innerHTML = '';
-            data.forEach(d => {
-                const prob = (d.win_rate_10 * 100).toFixed(1);
-                body.innerHTML += `
-                    <tr class="border-b border-gray-800 hover:bg-emerald-500/5">
-                        <td class="p-5 font-bold text-white">${d.player_name}</td>
-                        <td class="p-5">
-                            <div class="text-[10px] text-gray-500 uppercase font-black">${d.prop_type}</div>
-                            <div class="text-sm font-bold text-emerald-400">${d.suggestion} ${d.market_line}</div>
-                        </td>
-                        <td class="p-5 text-center"><div class="text-xl font-black orbitron text-blue-400">${prob}%</div></td>
-                        <td class="p-5 text-center text-[11px] font-mono text-gray-500">${d.trend_history || '---'}</td>
-                        <td class="p-5 text-right font-black text-emerald-400">+${(d.ev_10 || 0).toFixed(1)}%</td>
-                    </tr>`;
-            });
-        }
-
-        async function loadUsers() {
-            const role = localStorage.getItem('role');
-            const res = await fetch(`/api/admin/users?role=${role}`);
-            const data = await res.json();
-            const body = document.getElementById('user-table-body');
-            body.innerHTML = '';
-            data.forEach(u => {
-                body.innerHTML += `
-                    <tr class="border-b border-gray-800">
-                        <td class="p-5 text-white">${u.username}</td>
-                        <td class="p-5 text-gray-400">${u.password}</td>
-                        <td class="p-5 text-xs uppercase font-bold text-gray-500">${u.role}</td>
-                        <td class="p-5 text-right">
-                            <button onclick="deleteUser('${u.username}')" class="text-red-500 text-xs font-bold hover:underline">DELETE</button>
-                        </td>
-                    </tr>`;
-            });
-        }
-
-        async function deleteUser(username) {
-            if(confirm('Delete ' + username + '?')) {
-                await fetch('/api/admin/delete-user', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({username: username})
-                });
+    function checkAuth() {
+        const user = localStorage.getItem('user');
+        const role = localStorage.getItem('role');
+        if(user) {
+            document.getElementById('login-gate').classList.add('hidden');
+            document.getElementById('dashboard-content').classList.remove('hidden');
+            document.getElementById('logout-btn').classList.remove('hidden');
+            document.getElementById('display-user').innerText = user;
+            if(role === 'admin') {
+                document.getElementById('btn-users-tab').classList.remove('hidden');
                 loadUsers();
             }
-        }
-
-        async function triggerSync(type) {
-            const res = await fetch(`/api/sync/${type}`, { method: 'POST' });
-            const data = await res.json();
-            alert(data.message);
             loadData();
         }
+    }
 
-        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
-        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
-        function logout() { localStorage.clear(); location.reload(); }
-        checkAuth();
-    </script>
+    function showTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        document.getElementById('btn-' + tabId).classList.add('active');
+    }
+
+    async function loadData() {
+        const res = await fetch('/api/data');
+        const data = await res.json();
+        const body = document.getElementById('table-body');
+        body.innerHTML = '';
+        data.forEach(d => {
+            const prob = (d.win_rate_10 * 100).toFixed(1);
+            body.innerHTML += `
+                <tr class="border-b border-gray-800 hover:bg-emerald-500/5">
+                    <td class="p-5 font-bold text-white">${d.player_name}</td>
+                    <td class="p-5">
+                        <div class="text-[10px] text-gray-500 uppercase font-black">${d.prop_type}</div>
+                        <div class="text-sm font-bold text-emerald-400">${d.suggestion} ${d.market_line}</div>
+                    </td>
+                    <td class="p-5 text-center"><div class="text-xl font-black orbitron text-blue-400">${prob}%</div></td>
+                    <td class="p-5 text-center text-[11px] font-mono text-gray-500">${d.trend_history || '---'}</td>
+                    <td class="p-5 text-right font-black text-emerald-400">+${(d.ev_10 || 0).toFixed(1)}%</td>
+                </tr>`;
+        });
+    }
+
+    async function loadUsers() {
+        const role = localStorage.getItem('role');
+        const res = await fetch(`/api/admin/users?role=${role}`);
+        const data = await res.json();
+        const body = document.getElementById('user-table-body');
+        body.innerHTML = '';
+        data.forEach(u => {
+            body.innerHTML += `
+                <tr class="border-b border-gray-800">
+                    <td class="p-5 text-white">${u.username}</td>
+                    <td class="p-5 text-gray-400">********</td>
+                    <td class="p-5 text-xs uppercase font-bold text-gray-500">${u.role}</td>
+                    <td class="p-5 text-right">
+                        <button onclick="deleteUser('${u.username}')" class="text-red-500 text-xs font-bold hover:underline">DELETE</button>
+                    </td>
+                </tr>`;
+        });
+    }
+
+    async function deleteUser(username) {
+        if(confirm('Delete ' + username + '?')) {
+            await fetch('/api/admin/delete-user', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: username})
+            });
+            loadUsers();
+        }
+    }
+
+    async function triggerSync(type) {
+        const res = await fetch(`/api/sync/${type}`, { method: 'POST' });
+        const data = await res.json();
+        alert(data.message);
+        loadData();
+    }
+
+    function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+    function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+    function logout() { localStorage.clear(); location.reload(); }
+    checkAuth();
+</script>
 </body>
 </html>

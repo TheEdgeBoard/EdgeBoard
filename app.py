@@ -89,16 +89,28 @@ def register():
     data = request.json
     conn = get_db_connection()
     try:
-        # NOTICE: We use data['requested_username'] to match the JS payload
+        # 1. Insert into Database
         conn.execute('''
             INSERT INTO users (username, password, role, full_name, email, status) 
             VALUES (?, ?, ?, ?, ?, ?)''',
             (data['requested_username'], 'PENDING_SETUP', 'viewer', 
              data['full_name'], data['email'], 'pending'))
         conn.commit()
-        return jsonify({"status": "success"})
+
+        # 2. Notify Admin (You)
+        send_email("NEW ACCESS REQUEST", ADMIN_EMAIL, 
+                   f"Name: {data['full_name']}\nEmail: {data['email']}\nUser: {data['requested_username']}")
+        
+        # 3. Invite User
+        setup_link = f"https://theedgeboard.pythonanywhere.com/setup-password?user={data['requested_username']}"
+        send_email("Activate Your EdgeBoard Account", data['email'], 
+                   f"Hello {data['full_name']},\n\nClick here to set your password: {setup_link}")
+
+        return jsonify({"status": "success", "message": "Request sent! Check your email."})
     except sqlite3.IntegrityError:
         return jsonify({"status": "error", "message": "Username already exists"}), 400
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
     finally:
         conn.close()
 
