@@ -4,7 +4,7 @@ import os
 import sys
 
 # Your API Configuration
-API_KEY = 'your_api_key_here'
+API_KEY = 'e95fe4afaf21151d8ac43cfaef741522'
 API_URL = 'https://api.the-odds-api.com/v4/sports/basketball_nba/odds'
 
 def sync_all_markets():
