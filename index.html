@@ -9,16 +9,24 @@
     <style>
         body { font-family: 'Inter', sans-serif; background: #0f172a; color: #f8fafc; }
         .orbitron { font-family: 'Orbitron', sans-serif; }
+        .modal { transition: opacity 0.3s ease-in-out; }
+        .modal-content { transform: scale(0.95); transition: transform 0.3s ease-in-out; }
+        .modal.active .modal-content { transform: scale(1); }
     </style>
 </head>
-<body class="min-h-screen">
+<body class="min-h-screen flex flex-col">
 
     <nav class="bg-gray-900 border-b border-gray-800 p-4 sticky top-0 z-40 shadow-xl">
         <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-            <h1 class="orbitron text-xl font-bold text-emerald-400 tracking-tighter">EDGE BOARD</h1>
+            
+            <div class="flex items-center gap-3">
+                <h1 class="orbitron text-xl font-bold text-emerald-400 tracking-tighter cursor-pointer" onclick="location.reload()">EDGE BOARD</h1>
+                <span id="user-badge" class="hidden text-[10px] uppercase font-bold text-gray-500 bg-gray-800 px-2 py-1 rounded"></span>
+            </div>
             
             <div class="flex items-center gap-4">
-                <div class="flex items-center gap-2 bg-gray-800 px-4 py-2 rounded border border-gray-700 shadow-inner">
+                
+                <div id="filter-container" class="hidden flex items-center gap-2 bg-gray-800 px-4 py-2 rounded border border-gray-700 shadow-inner">
                     <span class="text-[10px] text-gray-400 uppercase font-bold">Sim Basis:</span>
                     <select id="sim-window-select" onchange="renderTable()" class="bg-transparent text-sm text-emerald-400 font-bold outline-none cursor-pointer">
                         <option value="3">Last 3 Games (Hot/Cold)</option>
@@ -28,17 +36,28 @@
                     </select>
                 </div>
 
-                <div class="flex gap-2">
-                    <button id="btn-odds" onclick="triggerSync('odds')" class="bg-blue-900/30 text-blue-400 text-[10px] font-bold px-3 py-2 rounded border border-blue-500/30 hover:bg-blue-800/50">SYNC ODDS</button>
-                    <button id="btn-stats" onclick="triggerSync('stats')" class="bg-emerald-900/30 text-emerald-400 text-[10px] font-bold px-3 py-2 rounded border border-emerald-500/30 hover:bg-emerald-800/50">SYNC STATS</button>
-                    <button onclick="location.reload()" class="text-gray-500 hover:text-white text-xs font-bold uppercase ml-2">LOGOUT</button>
+                <div id="auth-buttons" class="flex gap-2">
+                    <button onclick="openModal('modal-login')" class="text-xs font-bold text-white hover:text-emerald-400 px-3 py-2">LOGIN</button>
+                    <button onclick="openModal('modal-register')" class="bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold px-4 py-2 rounded transition-all shadow-lg shadow-emerald-900/50">CREATE ACCOUNT</button>
+                </div>
+
+                <div id="admin-buttons" class="hidden flex gap-2">
+                    <button id="btn-odds" onclick="triggerSync('odds')" class="hidden bg-blue-900/30 text-blue-400 text-[10px] font-bold px-3 py-2 rounded border border-blue-500/30 hover:bg-blue-800/50">SYNC ODDS</button>
+                    <button id="btn-stats" onclick="triggerSync('stats')" class="hidden bg-emerald-900/30 text-emerald-400 text-[10px] font-bold px-3 py-2 rounded border border-emerald-500/30 hover:bg-emerald-800/50">SYNC STATS</button>
+                    <button onclick="logout()" class="text-gray-500 hover:text-white text-xs font-bold uppercase ml-2">LOGOUT</button>
                 </div>
             </div>
         </div>
     </nav>
 
-    <main class="max-w-7xl mx-auto p-4 md:p-6">
-        <div class="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden shadow-2xl">
+    <main class="max-w-7xl mx-auto p-4 md:p-6 w-full flex-grow">
+        <div id="login-gate" class="text-center py-20">
+            <h2 class="text-2xl font-bold text-white mb-4">Unlock Professional Sports Analytics</h2>
+            <p class="text-gray-400 mb-8">Sign in to view real-time EV edges and Monte Carlo simulations.</p>
+            <button onclick="openModal('modal-register')" class="bg-emerald-500 text-black font-bold px-8 py-3 rounded text-lg hover:bg-emerald-400">Get Started Free</button>
+        </div>
+
+        <div id="dashboard-content" class="hidden bg-gray-900 rounded-xl border border-gray-800 overflow-hidden shadow-2xl">
             <table class="w-full text-left">
                 <thead class="bg-gray-800/50 text-gray-500 text-[10px] uppercase tracking-widest border-b border-gray-800">
                     <tr>
@@ -54,13 +73,71 @@
         </div>
     </main>
 
+    <div id="modal-login" class="modal fixed inset-0 bg-black/80 hidden z-50 flex items-center justify-center backdrop-blur-sm">
+        <div class="modal-content bg-gray-900 p-8 rounded-xl border border-gray-700 w-96 shadow-2xl">
+            <h2 class="text-xl font-bold text-white mb-6">Welcome Back</h2>
+            <input id="login-user" type="text" placeholder="Username" class="w-full bg-gray-800 border border-gray-700 text-white p-3 rounded mb-3 focus:border-emerald-500 outline-none">
+            <input id="login-pass" type="password" placeholder="Password" class="w-full bg-gray-800 border border-gray-700 text-white p-3 rounded mb-6 focus:border-emerald-500 outline-none">
+            <button onclick="login()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold p-3 rounded mb-4">LOGIN</button>
+            <button onclick="closeModal('modal-login')" class="w-full text-gray-500 text-xs hover:text-white">Cancel</button>
+        </div>
+    </div>
+
+    <div id="modal-register" class="modal fixed inset-0 bg-black/80 hidden z-50 flex items-center justify-center backdrop-blur-sm">
+        <div class="modal-content bg-gray-900 p-8 rounded-xl border border-gray-700 w-96 shadow-2xl">
+            <h2 class="text-xl font-bold text-white mb-2">Create Account</h2>
+            <p class="text-xs text-gray-400 mb-6">Join EdgeBoard for free analytics access.</p>
+            
+            <input id="reg-user" type="text" placeholder="Username" class="w-full bg-gray-800 border border-gray-700 text-white p-3 rounded mb-3 focus:border-emerald-500 outline-none">
+            <input id="reg-pass" type="password" placeholder="Password" class="w-full bg-gray-800 border border-gray-700 text-white p-3 rounded mb-3 focus:border-emerald-500 outline-none">
+            <input id="reg-email" type="email" placeholder="Email Address" class="w-full bg-gray-800 border border-gray-700 text-white p-3 rounded mb-3 focus:border-emerald-500 outline-none">
+            <input id="reg-phone" type="tel" placeholder="Phone (Optional)" class="w-full bg-gray-800 border border-gray-700 text-white p-3 rounded mb-6 focus:border-emerald-500 outline-none">
+            
+            <button onclick="register()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold p-3 rounded mb-4">CREATE ACCOUNT</button>
+            <button onclick="closeModal('modal-register')" class="w-full text-gray-500 text-xs hover:text-white">Cancel</button>
+        </div>
+    </div>
+
     <script>
         let globalData = [];
+        let userRole = localStorage.getItem('role');
+        let userName = localStorage.getItem('username');
 
+        // --- UI INITIALIZATION ---
+        function checkAuth() {
+            if (userRole) {
+                // LOGGED IN STATE
+                document.getElementById('auth-buttons').classList.add('hidden');
+                document.getElementById('admin-buttons').classList.remove('hidden');
+                document.getElementById('filter-container').classList.remove('hidden');
+                document.getElementById('login-gate').classList.add('hidden');
+                document.getElementById('dashboard-content').classList.remove('hidden');
+                
+                document.getElementById('user-badge').innerText = userName;
+                document.getElementById('user-badge').classList.remove('hidden');
+
+                if (userRole === 'admin') {
+                    document.getElementById('btn-odds').classList.remove('hidden');
+                    document.getElementById('btn-stats').classList.remove('hidden');
+                }
+                loadAnalytics();
+            } else {
+                // GUEST STATE
+                document.getElementById('auth-buttons').classList.remove('hidden');
+                document.getElementById('admin-buttons').classList.add('hidden');
+                document.getElementById('filter-container').classList.add('hidden');
+                document.getElementById('login-gate').classList.remove('hidden');
+                document.getElementById('dashboard-content').classList.add('hidden');
+            }
+        }
+
+        // --- DATA LOGIC ---
         async function loadAnalytics() {
-            const res = await fetch('/api/data');
-            globalData = await res.json();
-            renderTable();
+            try {
+                const res = await fetch('/api/data');
+                globalData = await res.json();
+                renderTable();
+            } catch (e) { console.error("Data load failed", e); }
         }
 
         function renderTable() {
@@ -74,7 +151,6 @@
             const tbody = document.getElementById('data-table-body');
             tbody.innerHTML = '';
 
-            // Filter: Only show positive plays for this specific window
             const activeData = globalData
                 .filter(d => d[`ev_${w}`] > 0)
                 .sort((a, b) => b[`ev_${w}`] - a[`ev_${w}`]);
@@ -121,6 +197,71 @@
             });
         }
 
+        // --- AUTH LOGIC ---
+        async function login() {
+            const user = document.getElementById('login-user').value;
+            const pass = document.getElementById('login-pass').value;
+            
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username: user, password: pass})
+                });
+                const data = await res.json();
+                
+                if (data.status === 'success') {
+                    localStorage.setItem('role', data.role);
+                    localStorage.setItem('username', data.username);
+                    location.reload();
+                } else {
+                    alert('Login Failed: ' + data.message);
+                }
+            } catch (e) { alert('Login Error'); }
+        }
+
+        async function register() {
+            const user = document.getElementById('reg-user').value;
+            const pass = document.getElementById('reg-pass').value;
+            const email = document.getElementById('reg-email').value;
+            const phone = document.getElementById('reg-phone').value;
+            
+            // Simple validation
+            if(!user || !pass || !email) { alert("Please fill in all required fields."); return; }
+
+            const btn = event.target;
+            const originalText = btn.innerText;
+            btn.innerText = "SENDING...";
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/create-user', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-User-Role': 'admin'}, // NOTE: In prod, remove admin header requirement or handle publicly
+                    body: JSON.stringify({username: user, password: pass, email: email, phone: phone, full_name: user})
+                });
+                const data = await res.json();
+                
+                if (data.status === 'pending') {
+                    alert('Verification Code Sent to Email! Check your inbox.');
+                    closeModal('modal-register');
+                    // In a real flow, you'd open a "Verify Code" modal here
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            } catch (e) { 
+                alert('Registration Error. Note: Currently restricted to Admin creation in this demo.'); 
+            }
+            btn.innerText = originalText;
+            btn.disabled = false;
+        }
+
+        function logout() {
+            localStorage.clear();
+            location.reload();
+        }
+
+        // --- ADMIN SYNC LOGIC ---
         async function triggerSync(type) {
             const btn = document.getElementById(`btn-${type}`);
             const original = btn.innerText;
@@ -131,12 +272,17 @@
                 const data = await res.json();
                 alert(data.message);
                 if(type === 'stats') loadAnalytics();
-            } catch (e) { alert("Error"); }
+            } catch (e) { alert("Sync Error"); }
             btn.innerText = original;
             btn.disabled = false;
         }
 
-        loadAnalytics();
+        // --- MODAL UTILS ---
+        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        // Start
+        checkAuth();
     </script>
 </body>
 </html>
