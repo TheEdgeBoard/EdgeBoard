@@ -4,6 +4,7 @@ import os
 import subprocess
 import smtplib
 from email.message import EmailMessage
+
 app = Flask(__name__)
 
 # --- CONFIGURATION ---
@@ -11,10 +12,12 @@ BASE_DIR = '/home/TheEdgeBoard/EdgeBoard/'
 DB_PATH = os.path.join(BASE_DIR, 'edgeboard.db')
 ADMIN_EMAIL = "edgeboardanalytics@gmail.com"
 EMAIL_PASS = "mzac cwka rtek biwj" # 16-character Google App Password
+
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
 def send_email(subject, recipient, body):
     msg = EmailMessage()
     msg.set_content(body)
@@ -27,6 +30,7 @@ def send_email(subject, recipient, body):
             smtp.send_message(msg)
     except Exception as e:
         print(f"Email error: {e}")
+
 @app.route('/setup-password')
 def setup_password_page():
     username = request.args.get('user')
@@ -75,47 +79,7 @@ def activate_account():
     conn.commit()
     conn.close()
     return jsonify({"status": "success", "message": "Account activated!"})
-@app.route('/setup-password')
-def setup_password_page():
-    username = request.args.get('user')
-    return render_template_string('''
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Setup Password</title>
-            <script src="https://cdn.tailwindcss.com"></script>
-            <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap" rel="stylesheet">
-            <style>body { font-family: 'Inter', sans-serif; }</style>
-        </head>
-        <body class="bg-gray-950 text-white flex items-center justify-center min-h-screen">
-            <div class="bg-gray-900 border border-gray-800 p-8 rounded-2xl w-full max-w-sm shadow-2xl text-center">
-                <h1 class="text-emerald-400 font-bold text-xl mb-2 tracking-tighter" style="font-family: 'Orbitron'">EDGE BOARD</h1>
-                <p class="text-gray-500 text-xs mb-6 uppercase tracking-widest">Account Activation</p>
-                
-                <h2 class="text-sm font-bold mb-4 text-left">Set Password for <span class="text-emerald-400">{{user}}</span></h2>
-                <input id="pw" type="password" placeholder="New Password" class="w-full bg-gray-800 border border-gray-700 p-3 rounded mb-4 focus:border-emerald-500 outline-none text-white">
-                
-                <button onclick="activate()" class="w-full bg-emerald-500 text-black font-bold py-3 rounded hover:bg-emerald-400 transition-all">ACTIVATE ACCOUNT</button>
-            </div>
 
-            <script>
-                async function activate() {
-                    const pass = document.getElementById('pw').value;
-                    if(!pass) { alert("Please enter a password."); return; }
-
-                    const res = await fetch('/api/activate-account', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({username: '{{user}}', password: pass})
-                    });
-                    const data = await res.json();
-                    alert(data.message);
-                    if(data.status === 'success') window.location.href = '/';
-                }
-            </script>
-        </body>
-        </html>
-    ''', user=username)
 @app.route('/')
 def home():
     try:
@@ -168,7 +132,6 @@ def register():
 
 @app.route('/api/admin/users', methods=['GET'])
 def get_all_users():
-    # Only returns data if the request comes from an admin
     role = request.args.get('role')
     if role != 'admin':
         return jsonify({"status": "error", "message": "Unauthorized"}), 403
