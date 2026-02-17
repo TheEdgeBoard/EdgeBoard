@@ -89,8 +89,12 @@ def register():
     data = request.json
     conn = get_db_connection()
     try:
-        conn.execute('INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
-                   (data['username'], data['password'], 'viewer'))
+        # NOTICE: We use data['requested_username'] to match the JS payload
+        conn.execute('''
+            INSERT INTO users (username, password, role, full_name, email, status) 
+            VALUES (?, ?, ?, ?, ?, ?)''',
+            (data['requested_username'], 'PENDING_SETUP', 'viewer', 
+             data['full_name'], data['email'], 'pending'))
         conn.commit()
         return jsonify({"status": "success"})
     except sqlite3.IntegrityError:
