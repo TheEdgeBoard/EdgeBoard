@@ -1,3 +1,120 @@
+I understand completely. You want that integrated, "single-page app" feel where the Admin controls are just another tab on the dashboard, visible only to you.
+
+To achieve this, we will add a hidden Admin Tab to your index.html that only unlocks if the user's role is admin.
+
+1. The Full app.py
+I’ve updated the /api/data route to also include a list of users, but only if the person requesting it is the admin. This keeps your data secure.
+
+Python
+from flask import Flask, jsonify, request
+import sqlite3
+import os
+import subprocess
+
+app = Flask(__name__)
+
+# --- CONFIGURATION ---
+BASE_DIR = '/home/TheEdgeBoard/EdgeBoard/'
+DB_PATH = os.path.join(BASE_DIR, 'edgeboard.db')
+
+def get_db_connection():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+@app.route('/')
+def home():
+    try:
+        return open(os.path.join(BASE_DIR, 'index.html'), encoding='utf-8').read()
+    except Exception as e:
+        return f"Error: index.html not found. {str(e)}"
+
+# --- AUTH & USER MANAGEMENT ---
+
+@app.route('/api/login', methods=['POST'])
+def login():
+    data = request.json
+    conn = get_db_connection()
+    user = conn.execute('SELECT * FROM users WHERE username = ? AND password = ?',
+                       (data['username'], data['password'])).fetchone()
+    conn.close()
+    if user:
+        return jsonify({"status": "success", "role": user['role'], "username": user['username']})
+    return jsonify({"status": "error", "message": "Invalid Credentials"}), 401
+
+@app.route('/api/register', methods=['POST'])
+def register():
+    data = request.json
+    conn = get_db_connection()
+    try:
+        conn.execute('INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
+                   (data['username'], data['password'], 'viewer'))
+        conn.commit()
+        return jsonify({"status": "success"})
+    except sqlite3.IntegrityError:
+        return jsonify({"status": "error", "message": "Username already exists"}), 400
+    finally:
+        conn.close()
+
+@app.route('/api/admin/users', methods=['GET'])
+def get_all_users():
+    # Only returns data if the request comes from an admin
+    role = request.args.get('role')
+    if role != 'admin':
+        return jsonify({"status": "error", "message": "Unauthorized"}), 403
+    
+    conn = get_db_connection()
+    users = conn.execute('SELECT username, password, role FROM users').fetchall()
+    conn.close()
+    return jsonify([dict(row) for row in users])
+
+@app.route('/api/admin/delete-user', methods=['POST'])
+def delete_user():
+    data = request.json
+    conn = get_db_connection()
+    conn.execute('DELETE FROM users WHERE username = ?', (data['username'],))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success"})
+
+# --- DATA & SYNC ---
+
+@app.route('/api/data')
+def get_data():
+    conn = get_db_connection()
+    query = '''
+        SELECT s.*, p.market_line, p.trend_history 
+        FROM sim_results s 
+        JOIN daily_prospects p ON s.player_name = p.player_name 
+        AND s.prop_type = p.prop_type
+    '''
+    results = conn.execute(query).fetchall()
+    conn.close()
+    return jsonify([dict(row) for row in results])
+
+@app.route('/api/sync/odds', methods=['POST'])
+def sync_odds_only():
+    try:
+        subprocess.run(["/usr/bin/python3", os.path.join(BASE_DIR, "sync_odds.py")], check=True)
+        return jsonify({"status": "success", "message": "Odds Synced."})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
+@app.route('/api/sync/stats', methods=['POST'])
+def sync_stats_only():
+    try:
+        subprocess.run(["/usr/bin/python3", os.path.join(BASE_DIR, "sync_stats.py")], check=True)
+        subprocess.run(["/usr/bin/python3", os.path.join(BASE_DIR, "run_sims.py")], check=True)
+        return jsonify({"status": "success", "message": "Analytics Complete."})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
+if __name__ == '__main__':
+    app.run(debug=True)
+2. The Full index.html
+I’ve added a "Tab" system. The Users tab will only appear if you log in as the admin.
+
+HTML
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,6 +125,9 @@
     <style>
         body { font-family: 'Inter', sans-serif; background: #0f172a; color: #f8fafc; }
         .orbitron { font-family: 'Orbitron', sans-serif; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .tab-btn.active { border-bottom: 2px solid #10b981; color: #10b981; }
     </style>
 </head>
 <body class="min-h-screen">
@@ -15,9 +135,8 @@
     <nav class="bg-gray-900 border-b border-gray-800 p-4 sticky top-0 z-50">
         <div class="max-w-7xl mx-auto flex justify-between items-center">
             <h1 class="orbitron text-xl font-bold text-emerald-400 tracking-tighter">EDGE BOARD</h1>
-            <div id="user-controls" class="flex gap-4 items-center">
+            <div class="flex gap-4 items-center">
                 <span id="display-user" class="text-xs text-gray-500 font-bold uppercase"></span>
-                <button onclick="openModal('pw-modal')" id="pw-btn" class="hidden text-[10px] text-blue-400 hover:underline uppercase">Change PW</button>
                 <button onclick="logout()" id="logout-btn" class="hidden text-xs text-gray-400 hover:text-white uppercase font-bold">Logout</button>
             </div>
         </div>
@@ -25,66 +144,75 @@
 
     <main class="max-w-7xl mx-auto p-6">
         <div id="login-gate" class="text-center py-20">
-            <h2 class="text-5xl font-black mb-6 tracking-tight">BEAT THE BOOKS.</h2>
-            <p class="text-gray-400 mb-10 max-w-md mx-auto">Access 10,000+ Monte Carlo simulations and EV edges for every NBA player prop.</p>
+            <h2 class="text-5xl font-black mb-6">BEAT THE BOOKS.</h2>
             <div class="flex justify-center gap-4">
-                <button onclick="openModal('login-modal')" class="bg-emerald-500 text-black font-bold px-8 py-3 rounded-lg hover:bg-emerald-400 transition-all">SIGN IN</button>
-                <button onclick="openModal('reg-modal')" class="bg-gray-800 text-white font-bold px-8 py-3 rounded-lg border border-gray-700 hover:bg-gray-700 transition-all">REGISTER</button>
+                <button onclick="openModal('login-modal')" class="bg-emerald-500 text-black font-bold px-8 py-3 rounded-lg hover:bg-emerald-400">SIGN IN</button>
+                <button onclick="openModal('reg-modal')" class="bg-gray-800 text-white font-bold px-8 py-3 rounded-lg border border-gray-700 hover:bg-gray-700">REGISTER</button>
             </div>
         </div>
 
         <div id="dashboard-content" class="hidden">
-            <div class="flex justify-between items-center mb-8">
-                <div class="flex gap-2">
-                    <button onclick="triggerSync('odds')" class="bg-blue-600 hover:bg-blue-500 text-[10px] font-bold px-4 py-2 rounded transition-colors">SYNC ODDS</button>
-                    <button onclick="triggerSync('stats')" class="bg-emerald-600 hover:bg-emerald-500 text-[10px] font-bold px-4 py-2 rounded transition-colors">SYNC STATS</button>
+            <div class="flex gap-6 mb-8 border-b border-gray-800">
+                <button onclick="showTab('props-tab')" id="btn-props-tab" class="tab-btn active pb-2 text-sm font-bold uppercase tracking-wider">Player Props</button>
+                <button onclick="showTab('users-tab')" id="btn-users-tab" class="tab-btn hidden pb-2 text-sm font-bold uppercase tracking-wider">User Management</button>
+            </div>
+
+            <div id="props-tab" class="tab-content active">
+                <div class="flex gap-2 mb-6">
+                    <button onclick="triggerSync('odds')" class="bg-blue-600 text-[10px] font-bold px-4 py-2 rounded">SYNC ODDS</button>
+                    <button onclick="triggerSync('stats')" class="bg-emerald-600 text-[10px] font-bold px-4 py-2 rounded">SYNC STATS</button>
+                </div>
+                <div class="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden shadow-2xl">
+                    <table class="w-full text-left">
+                        <thead class="bg-gray-800/50 text-[10px] uppercase text-gray-500 tracking-widest">
+                            <tr>
+                                <th class="p-5">Player</th>
+                                <th class="p-5">Market & Line</th>
+                                <th class="p-5 text-center">Sim Prob</th>
+                                <th class="p-5 text-center">Recent</th>
+                                <th class="p-5 text-right">EV Edge</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body"></tbody>
+                    </table>
                 </div>
             </div>
 
-            <div class="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden shadow-2xl">
-                <table class="w-full text-left border-collapse">
-                    <thead class="bg-gray-800/50 text-[10px] uppercase text-gray-500 tracking-[0.2em]">
-                        <tr>
-                            <th class="p-5">Player</th>
-                            <th class="p-5">Market & Line</th>
-                            <th class="p-5 text-center">Sim Probability</th>
-                            <th class="p-5 text-center">Recent Scores</th>
-                            <th class="p-5 text-right">EV Edge</th>
-                        </tr>
-                    </thead>
-                    <tbody id="table-body"></tbody>
-                </table>
+            <div id="users-tab" class="tab-content">
+                <div class="bg-gray-900 rounded-2xl border border-gray-800 overflow-hidden shadow-2xl">
+                    <table class="w-full text-left">
+                        <thead class="bg-gray-800/50 text-[10px] uppercase text-gray-500 tracking-widest">
+                            <tr>
+                                <th class="p-5">Username</th>
+                                <th class="p-5">Password</th>
+                                <th class="p-5">Role</th>
+                                <th class="p-5 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="user-table-body"></tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </main>
 
-    <div id="reg-modal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center p-4 z-[100] backdrop-blur-sm">
+    <div id="login-modal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center p-4 z-[100]">
         <div class="bg-gray-900 border border-gray-700 p-8 rounded-2xl w-full max-w-sm shadow-2xl">
-            <h3 class="orbitron text-lg mb-6">Create Account</h3>
-            <input id="r-user" type="text" placeholder="Username" class="w-full bg-gray-800 border border-gray-700 p-3 rounded mb-3 text-white outline-none focus:border-emerald-500">
-            <input id="r-pass" type="password" placeholder="Password" class="w-full bg-gray-800 border border-gray-700 p-3 rounded mb-6 text-white outline-none focus:border-emerald-500">
-            <button onclick="auth('register')" class="w-full bg-blue-600 text-white font-bold py-3 rounded hover:bg-blue-500 transition-colors">REGISTER</button>
-            <button onclick="closeModal('reg-modal')" class="w-full text-gray-500 text-xs mt-4 hover:text-white">Cancel</button>
+            <h3 class="orbitron text-lg mb-6 tracking-tighter">Welcome Back</h3>
+            <input id="l-user" type="text" placeholder="Username" class="w-full bg-gray-800 border border-gray-700 p-3 rounded mb-3 text-white">
+            <input id="l-pass" type="password" placeholder="Password" class="w-full bg-gray-800 border border-gray-700 p-3 rounded mb-6 text-white">
+            <button onclick="auth('login')" class="w-full bg-emerald-500 text-black font-bold py-3 rounded">SIGN IN</button>
+            <button onclick="closeModal('login-modal')" class="w-full text-gray-500 text-xs mt-4">Cancel</button>
         </div>
     </div>
 
-    <div id="login-modal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center p-4 z-[100] backdrop-blur-sm">
+    <div id="reg-modal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center p-4 z-[100]">
         <div class="bg-gray-900 border border-gray-700 p-8 rounded-2xl w-full max-w-sm shadow-2xl">
-            <h3 class="orbitron text-lg mb-6">Welcome Back</h3>
-            <input id="l-user" type="text" placeholder="Username" class="w-full bg-gray-800 border border-gray-700 p-3 rounded mb-3 text-white outline-none focus:border-emerald-500">
-            <input id="l-pass" type="password" placeholder="Password" class="w-full bg-gray-800 border border-gray-700 p-3 rounded mb-6 text-white outline-none focus:border-emerald-500">
-            <button onclick="auth('login')" class="w-full bg-emerald-500 text-black font-bold py-3 rounded hover:bg-emerald-400 transition-colors">SIGN IN</button>
-            <button onclick="closeModal('login-modal')" class="w-full text-gray-500 text-xs mt-4 hover:text-white">Cancel</button>
-        </div>
-    </div>
-
-    <div id="pw-modal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center p-4 z-[100] backdrop-blur-sm">
-        <div class="bg-gray-900 border border-gray-700 p-8 rounded-2xl w-full max-w-sm">
-            <h3 class="orbitron text-lg mb-6 text-blue-400">Security Update</h3>
-            <input id="p-old" type="password" placeholder="Current Password" class="w-full bg-gray-800 border border-gray-700 p-3 rounded mb-3 text-white">
-            <input id="p-new" type="password" placeholder="New Password" class="w-full bg-gray-800 border border-gray-700 p-3 rounded mb-6 text-white">
-            <button onclick="changePW()" class="w-full bg-blue-600 text-white font-bold py-3 rounded">UPDATE PASSWORD</button>
-            <button onclick="closeModal('pw-modal')" class="w-full text-gray-500 text-xs mt-4">Cancel</button>
+            <h3 class="orbitron text-lg mb-6 tracking-tighter">Register</h3>
+            <input id="r-user" type="text" placeholder="Username" class="w-full bg-gray-800 border border-gray-700 p-3 rounded mb-3 text-white">
+            <input id="r-pass" type="password" placeholder="Password" class="w-full bg-gray-800 border border-gray-700 p-3 rounded mb-6 text-white">
+            <button onclick="auth('register')" class="w-full bg-blue-600 text-white font-bold py-3 rounded">CREATE ACCOUNT</button>
+            <button onclick="closeModal('reg-modal')" class="w-full text-gray-500 text-xs mt-4">Cancel</button>
         </div>
     </div>
 
@@ -101,9 +229,10 @@
             if(data.status === 'success') {
                 if(type === 'login') {
                     localStorage.setItem('user', user);
+                    localStorage.setItem('role', data.role);
                     location.reload();
                 } else {
-                    alert("Account created! Please sign in.");
+                    alert("Registered! Please Sign In.");
                     closeModal('reg-modal');
                 }
             } else { alert(data.message); }
@@ -111,14 +240,25 @@
 
         function checkAuth() {
             const user = localStorage.getItem('user');
+            const role = localStorage.getItem('role');
             if(user) {
                 document.getElementById('login-gate').classList.add('hidden');
                 document.getElementById('dashboard-content').classList.remove('hidden');
                 document.getElementById('logout-btn').classList.remove('hidden');
-                document.getElementById('pw-btn').classList.remove('hidden');
                 document.getElementById('display-user').innerText = user;
+                if(role === 'admin') {
+                    document.getElementById('btn-users-tab').classList.remove('hidden');
+                    loadUsers();
+                }
                 loadData();
             }
+        }
+
+        function showTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            document.getElementById('btn-' + tabId).classList.add('active');
         }
 
         async function loadData() {
@@ -126,25 +266,50 @@
             const data = await res.json();
             const body = document.getElementById('table-body');
             body.innerHTML = '';
-            
             data.forEach(d => {
                 const prob = (d.win_rate_10 * 100).toFixed(1);
                 body.innerHTML += `
-                    <tr class="border-b border-gray-800 hover:bg-emerald-500/5 transition-colors">
+                    <tr class="border-b border-gray-800 hover:bg-emerald-500/5">
                         <td class="p-5 font-bold text-white">${d.player_name}</td>
                         <td class="p-5">
                             <div class="text-[10px] text-gray-500 uppercase font-black">${d.prop_type}</div>
                             <div class="text-sm font-bold text-emerald-400">${d.suggestion} ${d.market_line}</div>
                         </td>
-                        <td class="p-5 text-center">
-                            <div class="text-xl font-black orbitron text-blue-400">${prob}%</div>
-                        </td>
-                        <td class="p-5 text-center text-[11px] font-mono text-gray-500 tracking-tighter">${d.trend_history || '---'}</td>
+                        <td class="p-5 text-center"><div class="text-xl font-black orbitron text-blue-400">${prob}%</div></td>
+                        <td class="p-5 text-center text-[11px] font-mono text-gray-500">${d.trend_history || '---'}</td>
+                        <td class="p-5 text-right font-black text-emerald-400">+${(d.ev_10 || 0).toFixed(1)}%</td>
+                    </tr>`;
+            });
+        }
+
+        async function loadUsers() {
+            const role = localStorage.getItem('role');
+            const res = await fetch(`/api/admin/users?role=${role}`);
+            const data = await res.json();
+            const body = document.getElementById('user-table-body');
+            body.innerHTML = '';
+            data.forEach(u => {
+                body.innerHTML += `
+                    <tr class="border-b border-gray-800">
+                        <td class="p-5 text-white">${u.username}</td>
+                        <td class="p-5 text-gray-400">${u.password}</td>
+                        <td class="p-5 text-xs uppercase font-bold text-gray-500">${u.role}</td>
                         <td class="p-5 text-right">
-                            <div class="text-emerald-400 font-black">+${(d.ev_10 || 0).toFixed(1)}%</div>
+                            <button onclick="deleteUser('${u.username}')" class="text-red-500 text-xs font-bold hover:underline">DELETE</button>
                         </td>
                     </tr>`;
             });
+        }
+
+        async function deleteUser(username) {
+            if(confirm('Delete ' + username + '?')) {
+                await fetch('/api/admin/delete-user', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username: username})
+                });
+                loadUsers();
+            }
         }
 
         async function triggerSync(type) {
@@ -157,7 +322,6 @@
         function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
         function logout() { localStorage.clear(); location.reload(); }
-        async function changePW() { /* Logic same as previous version */ }
         checkAuth();
     </script>
 </body>
