@@ -14,11 +14,12 @@ def get_db_connection():
     conn.row_factory = sqlite3.Row
     return conn
 
-# --- ROUTES ---
-
 @app.route('/')
 def home():
-    return open(os.path.join(BASE_DIR, 'index.html'), encoding='utf-8').read()
+    try:
+        return open(os.path.join(BASE_DIR, 'index.html'), encoding='utf-8').read()
+    except Exception as e:
+        return f"Error: index.html not found at {BASE_DIR}"
 
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -27,7 +28,6 @@ def login():
     user = conn.execute('SELECT * FROM users WHERE username = ? AND password = ?',
                        (data['username'], data['password'])).fetchone()
     conn.close()
-    
     if user:
         return jsonify({"status": "success", "role": user['role'], "username": user['username']})
     return jsonify({"status": "error", "message": "Invalid Credentials"}), 401
@@ -35,7 +35,7 @@ def login():
 @app.route('/api/data')
 def get_data():
     conn = get_db_connection()
-    # Simplified Join for standard sqlite3
+    # Pulls stats and trends for the dashboard
     query = '''
         SELECT s.*, p.trend_history 
         FROM sim_results s
@@ -46,12 +46,11 @@ def get_data():
     conn.close()
     return jsonify([dict(row) for row in results])
 
-# --- SYSTEM SYNC ROUTES ---
-
 @app.route('/api/sync/odds', methods=['POST'])
 def sync_odds_only():
     try:
-        subprocess.run(["python3", os.path.join(BASE_DIR, "sync_odds.py")], check=True)
+        # Using full path to python3 for reliability
+        subprocess.run(["/usr/bin/python3", os.path.join(BASE_DIR, "sync_odds.py")], check=True)
         return jsonify({"status": "success", "message": "Odds Synced."})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
@@ -59,9 +58,9 @@ def sync_odds_only():
 @app.route('/api/sync/stats', methods=['POST'])
 def sync_stats_only():
     try:
-        subprocess.run(["python3", os.path.join(BASE_DIR, "sync_stats.py")], check=True)
-        subprocess.run(["python3", os.path.join(BASE_DIR, "run_sims.py")], check=True)
-        return jsonify({"status": "success", "message": "Stats & Sims Complete."})
+        subprocess.run(["/usr/bin/python3", os.path.join(BASE_DIR, "sync_stats.py")], check=True)
+        subprocess.run(["/usr/bin/python3", os.path.join(BASE_DIR, "run_sims.py")], check=True)
+        return jsonify({"status": "success", "message": "Analytics Complete."})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
 
