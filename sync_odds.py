@@ -1,86 +1,104 @@
-import sqlite3
 import requests
+import sqlite3
 import os
 import sys
+from datetime import datetime
 
-# Your API Configuration
-API_KEY = 'e95fe4afaf21151d8ac43cfaef741522'
-API_URL = 'https://api.the-odds-api.com/v4/sports/basketball_nba/odds'
+# --- CONFIGURATION ---
+API_KEY = 'e95fe4afaf21151d8ac43cfaef741522'  # <--- PASTE YOUR KEY BACK IN HERE!
+SPORT = 'basketball_nba'
+REGIONS = 'us'
 
-def sync_all_markets():
-    conn = sqlite3.connect('/home/TheEdgeBoard/EdgeBoard/edgeboard.db')
-    
-    # 9 Categories to fetch
-    markets = "player_points,player_rebounds,player_assists,player_pass_pts_reb_ast," \
-              "player_points_3_made,player_field_goals_made,player_field_goals_attempts," \
-              "player_points_3_attempts,player_rebounds_assists"
+# UPDATED MARKETS LIST: Adds PRA, PR, RA, and 3PM
+# Note: 'player_threes' = 3PM
+MARKETS = 'player_points,player_rebounds,player_assists,player_threes,player_points_rebounds_assists,player_points_rebounds,player_rebounds_assists'
 
+ODDS_FORMAT = 'decimal'
+DATE_FORMAT = 'iso'
+DB_PATH = '/home/TheEdgeBoard/EdgeBoard/edgeboard.db'
+
+def sync_odds():
+    print(f"Fetching expanded prop markets for {SPORT}...")
+
+    # 1. Fetch the Games
+    url = f'https://api.the-odds-api.com/v4/sports/{SPORT}/odds'
     params = {
-        'apiKey': API_KEY,
-        'regions': 'us',
-        'markets': markets,
-        'oddsFormat': 'american'
+        'api_key': API_KEY,
+        'regions': REGIONS,
+        'markets': MARKETS,
+        'oddsFormat': ODDS_FORMAT,
+        'dateFormat': DATE_FORMAT,
     }
 
     try:
-        response = requests.get(API_URL, params=params)
-        
-        # 1. HANDLE API ERRORS
+        response = requests.get(url, params=params)
         if response.status_code != 200:
-            print(f"API Error: {response.status_code}")
-            sys.exit(1) # Fail so app.py knows
+            print(f"API Error: {response.status_code} - {response.text}")
+            return
 
         data = response.json()
-
-        # 2. HANDLE NO GAMES (The Fix)
         if not data:
-            print("No games scheduled today (All-Star Break / Offseason).")
-            # Clear old data so dashboard is empty, not broken
-            conn.execute("DELETE FROM daily_prospects")
-            conn.commit()
-            conn.close()
-            sys.exit(0) # Exit successfully
+            print("No games scheduled today.")
+            return
 
-        # 3. NORMAL PROCESSING
-        conn.execute("DELETE FROM daily_prospects")
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+
+        # Clear old odds to prevent stale data
+        cursor.execute('DELETE FROM daily_prospects') 
+
+        print(f"Processing {len(data)} games...")
 
         for game in data:
-            for bookmaker in game.get('bookmakers', []):
-                if bookmaker['key'] == 'draftkings': 
-                    for market in bookmaker.get('markets', []):
-                        prop_map = {
-                            'player_points_3_made': 'FG3M',
-                            'player_points_3_attempts': 'FG3A',
-                            'player_field_goals_made': 'FGM',
-                            'player_field_goals_attempts': 'FGA',
-                            'player_rebounds_assists': 'RA'
-                        }
-                        
-                        raw_type = market['key']
-                        prop_type = prop_map.get(raw_type, raw_type.replace('player_', '').upper())
+            game_id = game['id']
+            home_team = game['home_team']
+            away_team = game['away_team']
 
-                        for outcome in market['outcomes']:
-                            if outcome['name'] == 'Over': 
-                                conn.execute('''
-                                    INSERT INTO daily_prospects (player_name, team_id, opponent_id, prop_type, market_line, implied_prob_over, implied_prob_under)
-                                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                                ''', (
-                                    outcome['description'],
-                                    game['home_team'] if outcome['description'] in game['home_team'] else game['away_team'],
-                                    game['away_team'] if outcome['description'] in game['home_team'] else game['home_team'],
-                                    prop_type,
-                                    outcome['point'],
-                                    0.52, 
-                                    0.52
-                                ))
+            for bookmaker in game['bookmakers']:
+                # We prioritize DraftKings or FanDuel for consistency, fallback to first available
+                if bookmaker['key'] not in ['draftkings', 'fanduel', 'mgm', 'caesars']:
+                    continue
+
+                for market in bookmaker['markets']:
+                    market_key = market['key'] # e.g., 'player_points', 'player_points_rebounds_assists'
+                    
+                    # Map API keys to readable Prop Types
+                    prop_map = {
+                        'player_points': 'PTS',
+                        'player_rebounds': 'REB',
+                        'player_assists': 'AST',
+                        'player_threes': 'FG3M', # 3PM
+                        'player_points_rebounds_assists': 'PRA',
+                        'player_points_rebounds': 'PR',
+                        'player_rebounds_assists': 'RA'
+                    }
+                    
+                    prop_type = prop_map.get(market_key)
+                    if not prop_type: continue
+
+                    for outcome in market['outcomes']:
+                        player_name = outcome['description']
+                        line = outcome.get('point') # The betting line (e.g., 24.5)
+                        if not line: continue
+                        
+                        # Save to Database
+                        # Note: implied_prob logic would go here, simplified for storage
+                        cursor.execute('''
+                            INSERT INTO daily_prospects (
+                                player_name, team_id, opponent_id, prop_type, market_line, 
+                                hits_last_3_over, hits_last_3_under, avg_last_3,
+                                hits_last_5_over, hits_last_5_under, avg_last_5,
+                                hits_last_10_over, hits_last_10_under, avg_last_10,
+                                hits_last_14_over, hits_last_14_under, avg_last_14
+                            ) VALUES (?, ?, ?, ?, ?, 0,0,0, 0,0,0, 0,0,0, 0,0,0)
+                        ''', (player_name, home_team, away_team, prop_type, line))
+
         conn.commit()
-        print("Market odds synced successfully.")
-        
+        conn.close()
+        print("Successfully synced all expanded props.")
+
     except Exception as e:
-        print(f"Odds Sync Failed: {e}")
-        sys.exit(1)
-    finally:
-        if conn: conn.close()
+        print(f"Sync Crash: {e}")
 
 if __name__ == "__main__":
-    sync_all_markets()
+    sync_odds()
