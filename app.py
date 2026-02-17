@@ -16,7 +16,12 @@ def get_db_connection():
 
 @app.route('/')
 def home():
-    return open(os.path.join(BASE_DIR, 'index.html'), encoding='utf-8').read()
+    try:
+        return open(os.path.join(BASE_DIR, 'index.html'), encoding='utf-8').read()
+    except Exception as e:
+        return f"Error: index.html not found. {str(e)}"
+
+# --- AUTH ROUTES ---
 
 @app.route('/api/register', methods=['POST'])
 def register():
@@ -46,7 +51,6 @@ def login():
 @app.route('/api/change-password', methods=['POST'])
 def change_password():
     data = request.json
-    # Basic auth check: requires current username and old password to verify
     conn = get_db_connection()
     user = conn.execute('SELECT * FROM users WHERE username = ? AND password = ?',
                        (data['username'], data['old_password'])).fetchone()
@@ -59,13 +63,30 @@ def change_password():
     conn.close()
     return jsonify({"status": "error", "message": "Verification failed"}), 401
 
+# --- DATA ROUTE ---
+
 @app.route('/api/data')
 def get_data():
     conn = get_db_connection()
-    query = 'SELECT s.*, p.trend_history FROM sim_results s JOIN daily_prospects p ON s.player_name = p.player_name AND s.prop_type = p.prop_type'
+    # Joined query to get both simulation results and market line info
+    query = '''
+        SELECT 
+            s.player_name, 
+            s.prop_type, 
+            s.suggestion, 
+            s.win_rate_10, 
+            s.ev_10,
+            p.market_line, 
+            p.trend_history 
+        FROM sim_results s 
+        JOIN daily_prospects p ON s.player_name = p.player_name 
+        AND s.prop_type = p.prop_type
+    '''
     results = conn.execute(query).fetchall()
     conn.close()
     return jsonify([dict(row) for row in results])
+
+# --- SYNC ROUTES ---
 
 @app.route('/api/sync/odds', methods=['POST'])
 def sync_odds_only():
