@@ -11,7 +11,7 @@ app = Flask(__name__)
 BASE_DIR = '/home/TheEdgeBoard/EdgeBoard/'
 DB_PATH = os.path.join(BASE_DIR, 'edgeboard.db')
 ADMIN_EMAIL = "edgeboardanalytics@gmail.com"
-EMAIL_PASS = "mzac cwka rtek biwj" # 16-character Google App Password
+EMAIL_PASS = "mzac cwka rtek biwj"
 
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
@@ -30,6 +30,8 @@ def send_email(subject, recipient, body):
             smtp.send_message(msg)
     except Exception as e:
         print(f"Email error: {e}")
+
+# --- WEB ROUTES ---
 
 @app.route('/setup-password')
 def setup_password_page():
@@ -93,6 +95,7 @@ def home():
 def login():
     data = request.json
     conn = get_db_connection()
+    # Updated login to check if status is active
     user = conn.execute('SELECT * FROM users WHERE username = ? AND password = ?',
                        (data['username'], data['password'])).fetchone()
     conn.close()
@@ -105,7 +108,6 @@ def register():
     data = request.json
     conn = get_db_connection()
     try:
-        # 1. Insert into Database
         conn.execute('''
             INSERT INTO users (username, password, role, full_name, email, status) 
             VALUES (?, ?, ?, ?, ?, ?)''',
@@ -113,11 +115,9 @@ def register():
              data['full_name'], data['email'], 'pending'))
         conn.commit()
 
-        # 2. Notify Admin (You)
         send_email("NEW ACCESS REQUEST", ADMIN_EMAIL, 
                    f"Name: {data['full_name']}\nEmail: {data['email']}\nUser: {data['requested_username']}")
         
-        # 3. Invite User
         setup_link = f"https://theedgeboard.pythonanywhere.com/setup-password?user={data['requested_username']}"
         send_email("Activate Your EdgeBoard Account", data['email'], 
                    f"Hello {data['full_name']},\n\nClick here to set your password: {setup_link}")
@@ -135,7 +135,6 @@ def get_all_users():
     role = request.args.get('role')
     if role != 'admin':
         return jsonify({"status": "error", "message": "Unauthorized"}), 403
-    
     conn = get_db_connection()
     users = conn.execute('SELECT username, password, role FROM users').fetchall()
     conn.close()
