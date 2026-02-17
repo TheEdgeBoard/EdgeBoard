@@ -3,98 +3,83 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EdgeBoard | Multi-Sim Analytics</title>
+    <title>EdgeBoard | Pro Analytics</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Inter:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background: #0f172a; color: #f8fafc; }
         .orbitron { font-family: 'Orbitron', sans-serif; }
         .modal { transition: opacity 0.3s ease-in-out; }
-        .modal-content { transform: scale(0.95); transition: transform 0.3s ease-in-out; }
-        .modal.active .modal-content { transform: scale(1); }
+        .trend-canvas { filter: drop-shadow(0 0 5px rgba(16, 185, 129, 0.2)); }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
 
     <nav class="bg-gray-900 border-b border-gray-800 p-4 sticky top-0 z-40 shadow-xl">
         <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-            
             <div class="flex items-center gap-3">
                 <h1 class="orbitron text-xl font-bold text-emerald-400 tracking-tighter cursor-pointer" onclick="location.reload()">EDGE BOARD</h1>
-                <span id="user-badge" class="hidden text-[10px] uppercase font-bold text-gray-500 bg-gray-800 px-2 py-1 rounded"></span>
+                <span id="user-badge" class="hidden text-[10px] uppercase font-bold text-gray-400 bg-gray-800 px-2 py-1 rounded border border-gray-700"></span>
             </div>
             
             <div class="flex items-center gap-4">
-                
                 <div id="filter-container" class="hidden flex items-center gap-2 bg-gray-800 px-4 py-2 rounded border border-gray-700 shadow-inner">
-                    <span class="text-[10px] text-gray-400 uppercase font-bold">Sim Basis:</span>
+                    <span class="text-[10px] text-gray-500 uppercase font-bold">Sim Basis:</span>
                     <select id="sim-window-select" onchange="renderTable()" class="bg-transparent text-sm text-emerald-400 font-bold outline-none cursor-pointer">
-                        <option value="3">Last 3 Games (Hot/Cold)</option>
-                        <option value="5">Last 5 Games (Trend)</option>
-                        <option value="10" selected>Last 10 Games (Standard)</option>
-                        <option value="14">Last 14 Games (Stable)</option>
+                        <option value="3">Last 3 Games</option>
+                        <option value="5">Last 5 Games</option>
+                        <option value="10" selected>Last 10 Games</option>
+                        <option value="14">Last 14 Games</option>
                     </select>
                 </div>
 
                 <div id="auth-buttons" class="flex gap-2">
-                    <button onclick="openModal('modal-login')" class="text-xs font-bold text-white hover:text-emerald-400 px-3 py-2">LOGIN</button>
+                    <button onclick="openModal('modal-login')" class="text-xs font-bold text-gray-400 hover:text-white px-3 py-2 uppercase tracking-widest">Login</button>
                     <button onclick="openModal('modal-register')" class="bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold px-4 py-2 rounded transition-all shadow-lg shadow-emerald-900/50">CREATE ACCOUNT</button>
                 </div>
 
                 <div id="admin-buttons" class="hidden flex gap-2">
-                    <button id="btn-odds" onclick="triggerSync('odds')" class="hidden bg-blue-900/30 text-blue-400 text-[10px] font-bold px-3 py-2 rounded border border-blue-500/30 hover:bg-blue-800/50">SYNC ODDS</button>
-                    <button id="btn-stats" onclick="triggerSync('stats')" class="hidden bg-emerald-900/30 text-emerald-400 text-[10px] font-bold px-3 py-2 rounded border border-emerald-500/30 hover:bg-emerald-800/50">SYNC STATS</button>
-                    <button onclick="logout()" class="text-gray-500 hover:text-white text-xs font-bold uppercase ml-2">LOGOUT</button>
+                    <button id="btn-odds" onclick="triggerSync('odds')" class="hidden bg-blue-900/20 text-blue-400 text-[10px] font-bold px-3 py-2 rounded border border-blue-500/30 hover:bg-blue-800/50 uppercase">Sync Odds</button>
+                    <button id="btn-stats" onclick="triggerSync('stats')" class="hidden bg-emerald-900/20 text-emerald-400 text-[10px] font-bold px-3 py-2 rounded border border-emerald-500/30 hover:bg-emerald-800/50 uppercase">Sync Stats</button>
+                    <button onclick="logout()" class="text-gray-500 hover:text-white text-[10px] font-bold uppercase ml-2">Logout</button>
                 </div>
             </div>
         </div>
     </nav>
 
     <main class="max-w-7xl mx-auto p-4 md:p-6 w-full flex-grow">
-        <div id="login-gate" class="text-center py-20">
-            <h2 class="text-2xl font-bold text-white mb-4">Unlock Professional Sports Analytics</h2>
-            <p class="text-gray-400 mb-8">Sign in to view real-time EV edges and Monte Carlo simulations.</p>
-            <button onclick="openModal('modal-register')" class="bg-emerald-500 text-black font-bold px-8 py-3 rounded text-lg hover:bg-emerald-400">Get Started Free</button>
+        <div id="login-gate" class="text-center py-24">
+            <h2 class="text-3xl font-bold text-white mb-4">Elite Betting Analytics</h2>
+            <p class="text-gray-400 mb-8 max-w-md mx-auto">Access real-time EV edges and visual performance trends for every NBA player prop.</p>
+            <button onclick="openModal('modal-register')" class="bg-emerald-500 text-black font-bold px-10 py-4 rounded-lg text-lg hover:scale-105 transition-transform">Get Started Free</button>
         </div>
 
-        <div id="dashboard-content" class="hidden bg-gray-900 rounded-xl border border-gray-800 overflow-hidden shadow-2xl">
-            <table class="w-full text-left">
-                <thead class="bg-gray-800/50 text-gray-500 text-[10px] uppercase tracking-widest border-b border-gray-800">
-                    <tr>
-                        <th class="p-4">Player</th>
-                        <th class="p-4">Market</th>
-                        <th class="p-4 text-center">Hit Rate <span id="col-hit" class="text-emerald-500"></span></th>
-                        <th class="p-4 text-center">Sim Win % <span id="col-win" class="text-emerald-500"></span></th>
-                        <th class="p-4 text-right">EV Edge <span id="col-ev" class="text-emerald-500"></span></th>
-                    </tr>
-                </thead>
-                <tbody id="data-table-body"></tbody>
-            </table>
+        <div id="dashboard-content" class="hidden">
+            <div class="overflow-x-auto bg-gray-900 rounded-xl border border-gray-800 shadow-2xl">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-gray-800/50 text-gray-500 text-[10px] uppercase tracking-[0.2em] border-b border-gray-800">
+                        <tr>
+                            <th class="p-4">Player / Team</th>
+                            <th class="p-4">Market</th>
+                            <th class="p-4 text-center">Trend (Last 5)</th>
+                            <th class="p-4 text-center">Hit Rate <span id="col-hit" class="text-emerald-500"></span></th>
+                            <th class="p-4 text-right">EV Edge <span id="col-ev" class="text-emerald-500"></span></th>
+                        </tr>
+                    </thead>
+                    <tbody id="data-table-body"></tbody>
+                </table>
+            </div>
         </div>
     </main>
 
-    <div id="modal-login" class="modal fixed inset-0 bg-black/80 hidden z-50 flex items-center justify-center backdrop-blur-sm">
-        <div class="modal-content bg-gray-900 p-8 rounded-xl border border-gray-700 w-96 shadow-2xl">
-            <h2 class="text-xl font-bold text-white mb-6">Welcome Back</h2>
-            <input id="login-user" type="text" placeholder="Username" class="w-full bg-gray-800 border border-gray-700 text-white p-3 rounded mb-3 focus:border-emerald-500 outline-none">
-            <input id="login-pass" type="password" placeholder="Password" class="w-full bg-gray-800 border border-gray-700 text-white p-3 rounded mb-6 focus:border-emerald-500 outline-none">
-            <button onclick="login()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold p-3 rounded mb-4">LOGIN</button>
-            <button onclick="closeModal('modal-login')" class="w-full text-gray-500 text-xs hover:text-white">Cancel</button>
-        </div>
-    </div>
-
-    <div id="modal-register" class="modal fixed inset-0 bg-black/80 hidden z-50 flex items-center justify-center backdrop-blur-sm">
-        <div class="modal-content bg-gray-900 p-8 rounded-xl border border-gray-700 w-96 shadow-2xl">
-            <h2 class="text-xl font-bold text-white mb-2">Create Account</h2>
-            <p class="text-xs text-gray-400 mb-6">Join EdgeBoard for free analytics access.</p>
-            
-            <input id="reg-user" type="text" placeholder="Username" class="w-full bg-gray-800 border border-gray-700 text-white p-3 rounded mb-3 focus:border-emerald-500 outline-none">
-            <input id="reg-pass" type="password" placeholder="Password" class="w-full bg-gray-800 border border-gray-700 text-white p-3 rounded mb-3 focus:border-emerald-500 outline-none">
-            <input id="reg-email" type="email" placeholder="Email Address" class="w-full bg-gray-800 border border-gray-700 text-white p-3 rounded mb-3 focus:border-emerald-500 outline-none">
-            <input id="reg-phone" type="tel" placeholder="Phone (Optional)" class="w-full bg-gray-800 border border-gray-700 text-white p-3 rounded mb-6 focus:border-emerald-500 outline-none">
-            
-            <button onclick="register()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold p-3 rounded mb-4">CREATE ACCOUNT</button>
-            <button onclick="closeModal('modal-register')" class="w-full text-gray-500 text-xs hover:text-white">Cancel</button>
+    <div id="modal-login" class="modal fixed inset-0 bg-black/90 hidden z-50 flex items-center justify-center backdrop-blur-md">
+        <div class="bg-gray-900 p-8 rounded-2xl border border-gray-800 w-96 shadow-2xl">
+            <h2 class="text-2xl font-bold text-white mb-6 orbitron tracking-tighter">Member Login</h2>
+            <input id="login-user" type="text" placeholder="Username" class="w-full bg-gray-800 border border-gray-700 text-white p-3 rounded-lg mb-3 focus:border-emerald-500 outline-none">
+            <input id="login-pass" type="password" placeholder="Password" class="w-full bg-gray-800 border border-gray-700 text-white p-3 rounded-lg mb-6 focus:border-emerald-500 outline-none">
+            <button onclick="login()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 rounded-lg transition-colors">ENTER PORTAL</button>
+            <button onclick="closeModal('modal-login')" class="w-full text-gray-500 text-xs mt-4 hover:text-white">Cancel</button>
         </div>
     </div>
 
@@ -103,50 +88,35 @@
         let userRole = localStorage.getItem('role');
         let userName = localStorage.getItem('username');
 
-        // --- UI INITIALIZATION ---
         function checkAuth() {
             if (userRole) {
-                // LOGGED IN STATE
                 document.getElementById('auth-buttons').classList.add('hidden');
                 document.getElementById('admin-buttons').classList.remove('hidden');
                 document.getElementById('filter-container').classList.remove('hidden');
                 document.getElementById('login-gate').classList.add('hidden');
                 document.getElementById('dashboard-content').classList.remove('hidden');
-                
                 document.getElementById('user-badge').innerText = userName;
                 document.getElementById('user-badge').classList.remove('hidden');
-
                 if (userRole === 'admin') {
                     document.getElementById('btn-odds').classList.remove('hidden');
                     document.getElementById('btn-stats').classList.remove('hidden');
                 }
                 loadAnalytics();
-            } else {
-                // GUEST STATE
-                document.getElementById('auth-buttons').classList.remove('hidden');
-                document.getElementById('admin-buttons').classList.add('hidden');
-                document.getElementById('filter-container').classList.add('hidden');
-                document.getElementById('login-gate').classList.remove('hidden');
-                document.getElementById('dashboard-content').classList.add('hidden');
             }
         }
 
-        // --- DATA LOGIC ---
         async function loadAnalytics() {
             try {
                 const res = await fetch('/api/data');
                 globalData = await res.json();
                 renderTable();
-            } catch (e) { console.error("Data load failed", e); }
+            } catch (e) { console.error("Data load failed"); }
         }
 
         function renderTable() {
             const w = document.getElementById('sim-window-select').value;
-            
-            // Update Headers
             document.getElementById('col-hit').innerText = `(L${w})`;
-            document.getElementById('col-win').innerText = `(Based on L${w})`;
-            document.getElementById('col-ev').innerText = `(L${w} EV)`;
+            document.getElementById('col-ev').innerText = `(L${w} % )`;
 
             const tbody = document.getElementById('data-table-body');
             tbody.innerHTML = '';
@@ -156,132 +126,90 @@
                 .sort((a, b) => b[`ev_${w}`] - a[`ev_${w}`]);
 
             if (activeData.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-500">No positive value plays found for the Last ${w} Games timeframe.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="5" class="p-12 text-center text-gray-500 font-bold">Waiting for games to resume...</td></tr>`;
                 return;
             }
 
-            activeData.forEach(d => {
-                const hits = d.suggestion === "OVER" ? d[`hits_${w}_over`] : d[`hits_${w}_under`];
-                const total = parseInt(w);
+            activeData.forEach((d, index) => {
                 const ev = d[`ev_${w}`];
-                const winRate = d[`win_rate_${w}`];
-
-                let pickColor = d.suggestion === "OVER" ? "text-emerald-400" : "text-sky-400";
-                let edgeColor = ev >= 10 ? "text-emerald-400 font-black" : "text-emerald-600 font-bold";
-                let hitBadge = hits/total >= 0.6 ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/50" : "bg-gray-800 text-gray-500 border-gray-700";
-
+                const chartId = `chart-${index}`;
+                
                 const row = `
-                <tr class="border-b border-gray-800 hover:bg-gray-800/30 transition-all">
+                <tr class="border-b border-gray-800/50 hover:bg-emerald-500/5 transition-all group">
                     <td class="p-4">
-                        <div class="font-bold text-white text-sm">${d.player_name}</div>
-                        <div class="text-[10px] text-gray-500">${d.team}</div>
+                        <div class="font-bold text-white group-hover:text-emerald-400 transition-colors">${d.player_name}</div>
+                        <div class="text-[10px] text-gray-500 font-bold uppercase tracking-wider">${d.team_id || 'NBA'}</div>
                     </td>
                     <td class="p-4">
-                        <div class="text-xs text-gray-300">${d.line_value} ${d.prop_type}</div>
-                        <div class="${pickColor} font-black text-[10px] tracking-widest uppercase bg-gray-900 inline-block px-2 py-0.5 mt-1 rounded border border-gray-800">${d.suggestion}</div>
+                        <div class="text-xs font-bold text-gray-300">${d.line_value} ${d.prop_type}</div>
+                        <div class="text-[9px] font-black text-emerald-400 bg-emerald-900/20 inline-block px-2 py-0.5 rounded border border-emerald-500/20 mt-1 uppercase">${d.suggestion}</div>
+                    </td>
+                    <td class="p-4 text-center w-32">
+                        <canvas id="${chartId}" class="trend-canvas" width="120" height="40"></canvas>
                     </td>
                     <td class="p-4 text-center">
-                        <span class="inline-block px-2 py-1 rounded text-xs font-bold border ${hitBadge}">
-                            ${hits}/${total}
+                        <span class="inline-block px-2 py-1 rounded text-xs font-black bg-gray-800 border border-gray-700 text-gray-300">
+                             ${d[`hits_${w}_over`] || 0} / ${w}
                         </span>
                     </td>
-                    <td class="p-4 text-center">
-                        <div class="text-white font-bold text-sm">${winRate}%</div>
-                        <div class="text-[9px] text-gray-500">Proj: ${d[`proj_${w}`]}</div>
-                    </td>
                     <td class="p-4 text-right">
-                        <div class="${edgeColor} text-sm">${ev.toFixed(1)}%</div>
+                        <div class="text-emerald-400 font-black text-sm">+${ev.toFixed(1)}%</div>
                     </td>
                 </tr>`;
                 tbody.innerHTML += row;
+
+                // Create Chart after the row exists in DOM
+                setTimeout(() => {
+                    const trendData = d.trend_history ? d.trend_history.split(',').map(Number) : [0,0,0,0,0];
+                    createSparkline(chartId, trendData);
+                }, 0);
             });
         }
 
-        // --- AUTH LOGIC ---
+        function createSparkline(id, dataPoints) {
+            const ctx = document.getElementById(id).getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dataPoints,
+                    datasets: [{
+                        data: dataPoints,
+                        borderColor: '#10b981',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: true,
+                        backgroundColor: 'rgba(16, 185, 129, 0.05)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: false,
+                    plugins: { legend: { display: false }, tooltip: { enabled: false } },
+                    scales: { x: { display: false }, y: { display: false } }
+                }
+            });
+        }
+
         async function login() {
             const user = document.getElementById('login-user').value;
             const pass = document.getElementById('login-pass').value;
-            
-            try {
-                const res = await fetch('/api/login', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({username: user, password: pass})
-                });
-                const data = await res.json();
-                
-                if (data.status === 'success') {
-                    localStorage.setItem('role', data.role);
-                    localStorage.setItem('username', data.username);
-                    location.reload();
-                } else {
-                    alert('Login Failed: ' + data.message);
-                }
-            } catch (e) { alert('Login Error'); }
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: user, password: pass})
+            });
+            const data = await res.json();
+            if (data.status === 'success') {
+                localStorage.setItem('role', data.role);
+                localStorage.setItem('username', data.username);
+                location.reload();
+            } else { alert(data.message); }
         }
 
-        async function register() {
-            const user = document.getElementById('reg-user').value;
-            const pass = document.getElementById('reg-pass').value;
-            const email = document.getElementById('reg-email').value;
-            const phone = document.getElementById('reg-phone').value;
-            
-            // Simple validation
-            if(!user || !pass || !email) { alert("Please fill in all required fields."); return; }
-
-            const btn = event.target;
-            const originalText = btn.innerText;
-            btn.innerText = "SENDING...";
-            btn.disabled = true;
-
-            try {
-                const res = await fetch('/api/create-user', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json', 'X-User-Role': 'admin'}, // NOTE: In prod, remove admin header requirement or handle publicly
-                    body: JSON.stringify({username: user, password: pass, email: email, phone: phone, full_name: user})
-                });
-                const data = await res.json();
-                
-                if (data.status === 'pending') {
-                    alert('Verification Code Sent to Email! Check your inbox.');
-                    closeModal('modal-register');
-                    // In a real flow, you'd open a "Verify Code" modal here
-                } else {
-                    alert('Error: ' + data.message);
-                }
-            } catch (e) { 
-                alert('Registration Error. Note: Currently restricted to Admin creation in this demo.'); 
-            }
-            btn.innerText = originalText;
-            btn.disabled = false;
-        }
-
-        function logout() {
-            localStorage.clear();
-            location.reload();
-        }
-
-        // --- ADMIN SYNC LOGIC ---
-        async function triggerSync(type) {
-            const btn = document.getElementById(`btn-${type}`);
-            const original = btn.innerText;
-            btn.innerText = "⏳..."; 
-            btn.disabled = true;
-            try {
-                const res = await fetch(`/api/sync/${type}`, { method: 'POST', headers: {'X-User-Role': 'admin'} });
-                const data = await res.json();
-                alert(data.message);
-                if(type === 'stats') loadAnalytics();
-            } catch (e) { alert("Sync Error"); }
-            btn.innerText = original;
-            btn.disabled = false;
-        }
-
-        // --- MODAL UTILS ---
+        function logout() { localStorage.clear(); location.reload(); }
         function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
         function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
-        // Start
         checkAuth();
     </script>
 </body>
