@@ -2,10 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EdgeBoard | Pro Analytics</title>
+    <title>EdgeBoard | Elite Analytics</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; background: #0f172a; color: #f8fafc; }
@@ -17,7 +15,9 @@
     <nav class="bg-gray-900 border-b border-gray-800 p-4 sticky top-0 z-50">
         <div class="max-w-7xl mx-auto flex justify-between items-center">
             <h1 class="orbitron text-xl font-bold text-emerald-400 tracking-tighter">EDGE BOARD</h1>
-            <div id="auth-controls" class="flex gap-4">
+            <div id="user-controls" class="flex gap-4 items-center">
+                <span id="display-user" class="text-xs text-gray-500 font-bold uppercase"></span>
+                <button onclick="openModal('pw-modal')" id="pw-btn" class="hidden text-[10px] text-blue-400 hover:underline uppercase">Change PW</button>
                 <button onclick="logout()" id="logout-btn" class="hidden text-xs text-gray-400 hover:text-white uppercase font-bold">Logout</button>
             </div>
         </div>
@@ -26,7 +26,10 @@
     <main class="max-w-7xl mx-auto p-6">
         <div id="login-gate" class="text-center py-20">
             <h2 class="text-4xl font-bold mb-6">Master the Market.</h2>
-            <button onclick="openLogin()" class="bg-emerald-500 text-black font-bold px-8 py-3 rounded-lg hover:bg-emerald-400 transition-all">SIGN IN TO DASHBOARD</button>
+            <div class="flex justify-center gap-4">
+                <button onclick="openModal('login-modal')" class="bg-emerald-500 text-black font-bold px-8 py-3 rounded-lg hover:bg-emerald-400">LOGIN</button>
+                <button onclick="openModal('reg-modal')" class="bg-gray-800 text-white font-bold px-8 py-3 rounded-lg border border-gray-700 hover:bg-gray-700">CREATE ACCOUNT</button>
+            </div>
         </div>
 
         <div id="dashboard-content" class="hidden">
@@ -35,10 +38,6 @@
                     <button onclick="triggerSync('odds')" class="bg-blue-600 text-[10px] font-bold px-3 py-1 rounded">SYNC ODDS</button>
                     <button onclick="triggerSync('stats')" class="bg-emerald-600 text-[10px] font-bold px-3 py-1 rounded">SYNC STATS</button>
                 </div>
-                <select id="window-select" onchange="renderTable()" class="bg-gray-800 text-xs p-2 rounded border border-gray-700">
-                    <option value="5">L5 Games</option>
-                    <option value="10" selected>L10 Games</option>
-                </select>
             </div>
 
             <div class="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden shadow-2xl">
@@ -47,7 +46,7 @@
                         <tr>
                             <th class="p-4">Player</th>
                             <th class="p-4">Market</th>
-                            <th class="p-4 text-center">Trend (L5)</th>
+                            <th class="p-4 text-center">Recent Scores</th>
                             <th class="p-4 text-right">EV Edge</th>
                         </tr>
                     </thead>
@@ -57,76 +56,96 @@
         </div>
     </main>
 
-    <div id="login-modal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center p-4">
+    <div id="login-modal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center p-4 z-[100]">
         <div class="bg-gray-900 border border-gray-700 p-8 rounded-2xl w-full max-w-sm">
-            <h3 class="orbitron text-lg mb-6">Member Login</h3>
-            <input id="user" type="text" placeholder="Username" class="w-full bg-gray-800 border border-gray-700 p-3 rounded mb-3">
-            <input id="pass" type="password" placeholder="Password" class="w-full bg-gray-800 border border-gray-700 p-3 rounded mb-6">
-            <button onclick="login()" class="w-full bg-emerald-500 text-black font-bold py-3 rounded">ENTER</button>
+            <h3 class="orbitron text-lg mb-6">Login</h3>
+            <input id="l-user" type="text" placeholder="Username" class="w-full bg-gray-800 border border-gray-700 p-3 rounded mb-3 text-white">
+            <input id="l-pass" type="password" placeholder="Password" class="w-full bg-gray-800 border border-gray-700 p-3 rounded mb-6 text-white">
+            <button onclick="auth('login')" class="w-full bg-emerald-500 text-black font-bold py-3 rounded">ENTER</button>
+            <button onclick="closeModal('login-modal')" class="w-full text-gray-500 text-xs mt-4">Cancel</button>
+        </div>
+    </div>
+
+    <div id="reg-modal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center p-4 z-[100]">
+        <div class="bg-gray-900 border border-gray-700 p-8 rounded-2xl w-full max-w-sm">
+            <h3 class="orbitron text-lg mb-6">Create Account</h3>
+            <input id="r-user" type="text" placeholder="Username" class="w-full bg-gray-800 border border-gray-700 p-3 rounded mb-3 text-white">
+            <input id="r-pass" type="password" placeholder="Password" class="w-full bg-gray-800 border border-gray-700 p-3 rounded mb-6 text-white">
+            <button onclick="auth('register')" class="w-full bg-blue-600 text-white font-bold py-3 rounded">REGISTER</button>
+            <button onclick="closeModal('reg-modal')" class="w-full text-gray-500 text-xs mt-4">Cancel</button>
+        </div>
+    </div>
+
+    <div id="pw-modal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center p-4 z-[100]">
+        <div class="bg-gray-900 border border-gray-700 p-8 rounded-2xl w-full max-w-sm">
+            <h3 class="orbitron text-lg mb-6 text-blue-400">Change Password</h3>
+            <input id="p-old" type="password" placeholder="Current Password" class="w-full bg-gray-800 border border-gray-700 p-3 rounded mb-3 text-white">
+            <input id="p-new" type="password" placeholder="New Password" class="w-full bg-gray-800 border border-gray-700 p-3 rounded mb-6 text-white">
+            <button onclick="changePW()" class="w-full bg-blue-600 text-white font-bold py-3 rounded">UPDATE PASSWORD</button>
+            <button onclick="closeModal('pw-modal')" class="w-full text-gray-500 text-xs mt-4">Cancel</button>
         </div>
     </div>
 
     <script>
-        let rawData = [];
-        
-        async function login() {
-            const res = await fetch('/api/login', {
+        async function auth(type) {
+            const user = document.getElementById(type === 'login' ? 'l-user' : 'r-user').value;
+            const pass = document.getElementById(type === 'login' ? 'l-pass' : 'r-pass').value;
+            const res = await fetch(`/api/${type}`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({username: document.getElementById('user').value, password: document.getElementById('pass').value})
+                body: JSON.stringify({username: user, password: pass})
             });
             const data = await res.json();
             if(data.status === 'success') {
-                localStorage.setItem('user', data.username);
-                location.reload();
-            }
+                if(type === 'login') {
+                    localStorage.setItem('user', user);
+                    location.reload();
+                } else {
+                    alert("Account created! Please login.");
+                    closeModal('reg-modal');
+                }
+            } else { alert(data.message); }
+        }
+
+        async function changePW() {
+            const oldP = document.getElementById('p-old').value;
+            const newP = document.getElementById('p-new').value;
+            const user = localStorage.getItem('user');
+            const res = await fetch('/api/change-password', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: user, old_password: oldP, new_password: newP})
+            });
+            const data = await res.json();
+            alert(data.message);
+            if(data.status === 'success') closeModal('pw-modal');
         }
 
         function checkAuth() {
-            if(localStorage.getItem('user')) {
+            const user = localStorage.getItem('user');
+            if(user) {
                 document.getElementById('login-gate').classList.add('hidden');
                 document.getElementById('dashboard-content').classList.remove('hidden');
                 document.getElementById('logout-btn').classList.remove('hidden');
+                document.getElementById('pw-btn').classList.remove('hidden');
+                document.getElementById('display-user').innerText = user;
                 loadData();
             }
         }
 
         async function loadData() {
             const res = await fetch('/api/data');
-            rawData = await res.json();
-            renderTable();
-        }
-
-        function renderTable() {
-            const win = document.getElementById('window-select').value;
+            const data = await res.json();
             const body = document.getElementById('table-body');
             body.innerHTML = '';
-
-            rawData.forEach((d, i) => {
-                const ev = d[`ev_${win}`] || 0;
-                const canvasId = `chart-${i}`;
-                const row = `
-                    <tr class="border-b border-gray-800 hover:bg-emerald-500/5">
+            data.forEach(d => {
+                body.innerHTML += `
+                    <tr class="border-b border-gray-800">
                         <td class="p-4 font-bold text-white">${d.player_name}</td>
                         <td class="p-4 text-xs text-gray-400">${d.prop_type} <span class="text-emerald-400">${d.suggestion}</span></td>
-                        <td class="p-4 text-center"><canvas id="${canvasId}" width="100" height="30"></canvas></td>
-                        <td class="p-4 text-right text-emerald-400 font-bold">+${ev.toFixed(1)}%</td>
-                    </tr>
-                `;
-                body.innerHTML += row;
-
-                setTimeout(() => {
-                    const ctx = document.getElementById(canvasId).getContext('2d');
-                    const trend = d.trend_history ? d.trend_history.split(',').map(Number) : [0,0,0,0,0];
-                    new Chart(ctx, {
-                        type: 'line',
-                        data: {
-                            labels: trend,
-                            datasets: [{ data: trend, borderColor: '#10b981', borderWidth: 2, pointRadius: 0, fill: false, tension: 0.4 }]
-                        },
-                        options: { plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } }
-                    });
-                }, 0);
+                        <td class="p-4 text-center text-xs font-mono text-gray-500">${d.trend_history || 'N/A'}</td>
+                        <td class="p-4 text-right text-emerald-400 font-bold">+${(d.ev_10 || 0).toFixed(1)}%</td>
+                    </tr>`;
             });
         }
 
@@ -137,7 +156,8 @@
             loadData();
         }
 
-        function openLogin() { document.getElementById('login-modal').classList.remove('hidden'); }
+        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
         function logout() { localStorage.clear(); location.reload(); }
         checkAuth();
     </script>

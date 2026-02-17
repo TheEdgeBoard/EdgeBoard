@@ -16,10 +16,21 @@ def get_db_connection():
 
 @app.route('/')
 def home():
+    return open(os.path.join(BASE_DIR, 'index.html'), encoding='utf-8').read()
+
+@app.route('/api/register', methods=['POST'])
+def register():
+    data = request.json
+    conn = get_db_connection()
     try:
-        return open(os.path.join(BASE_DIR, 'index.html'), encoding='utf-8').read()
-    except Exception as e:
-        return f"Error: index.html not found at {BASE_DIR}"
+        conn.execute('INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
+                   (data['username'], data['password'], 'viewer'))
+        conn.commit()
+        return jsonify({"status": "success"})
+    except sqlite3.IntegrityError:
+        return jsonify({"status": "error", "message": "Username already exists"}), 400
+    finally:
+        conn.close()
 
 @app.route('/api/login', methods=['POST'])
 def login():
@@ -32,16 +43,26 @@ def login():
         return jsonify({"status": "success", "role": user['role'], "username": user['username']})
     return jsonify({"status": "error", "message": "Invalid Credentials"}), 401
 
+@app.route('/api/change-password', methods=['POST'])
+def change_password():
+    data = request.json
+    # Basic auth check: requires current username and old password to verify
+    conn = get_db_connection()
+    user = conn.execute('SELECT * FROM users WHERE username = ? AND password = ?',
+                       (data['username'], data['old_password'])).fetchone()
+    if user:
+        conn.execute('UPDATE users SET password = ? WHERE username = ?',
+                   (data['new_password'], data['username']))
+        conn.commit()
+        conn.close()
+        return jsonify({"status": "success", "message": "Password updated successfully"})
+    conn.close()
+    return jsonify({"status": "error", "message": "Verification failed"}), 401
+
 @app.route('/api/data')
 def get_data():
     conn = get_db_connection()
-    # Pulls stats and trends for the dashboard
-    query = '''
-        SELECT s.*, p.trend_history 
-        FROM sim_results s
-        JOIN daily_prospects p ON s.player_name = p.player_name 
-        AND s.prop_type = p.prop_type
-    '''
+    query = 'SELECT s.*, p.trend_history FROM sim_results s JOIN daily_prospects p ON s.player_name = p.player_name AND s.prop_type = p.prop_type'
     results = conn.execute(query).fetchall()
     conn.close()
     return jsonify([dict(row) for row in results])
@@ -49,7 +70,6 @@ def get_data():
 @app.route('/api/sync/odds', methods=['POST'])
 def sync_odds_only():
     try:
-        # Using full path to python3 for reliability
         subprocess.run(["/usr/bin/python3", os.path.join(BASE_DIR, "sync_odds.py")], check=True)
         return jsonify({"status": "success", "message": "Odds Synced."})
     except Exception as e:
