@@ -1,19 +1,69 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template_string
 import sqlite3
 import os
 import subprocess
-
+import smtplib
+from email.message import EmailMessage
 app = Flask(__name__)
 
 # --- CONFIGURATION ---
 BASE_DIR = '/home/TheEdgeBoard/EdgeBoard/'
 DB_PATH = os.path.join(BASE_DIR, 'edgeboard.db')
-
+ADMIN_EMAIL = "edgeboardanalytics@gmail.com"
+EMAIL_PASS = "mzac cwka rtek biwj" # 16-character Google App Password
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+def send_email(subject, recipient, body):
+    msg = EmailMessage()
+    msg.set_content(body)
+    msg['Subject'] = subject
+    msg['From'] = ADMIN_EMAIL
+    msg['To'] = recipient
+    try:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
+            smtp.login(ADMIN_EMAIL, EMAIL_PASS)
+            smtp.send_message(msg)
+    except Exception as e:
+        print(f"Email error: {e}")
+@app.route('/setup-password')
+def setup_password_page():
+    username = request.args.get('user')
+    return render_template_string('''
+        <!DOCTYPE html>
+        <html>
+        <head><title>Setup Password</title><script src="https://cdn.tailwindcss.com"></script></head>
+        <body class="bg-gray-950 text-white flex items-center justify-center min-h-screen">
+            <div class="bg-gray-900 border border-gray-800 p-8 rounded-2xl w-full max-w-sm">
+                <h1 class="text-emerald-400 font-bold mb-4">Set Password for {{user}}</h1>
+                <input id="pw" type="password" placeholder="New Password" class="w-full bg-gray-800 p-3 rounded mb-4">
+                <button onclick="activate()" class="w-full bg-emerald-500 text-black font-bold py-3 rounded">ACTIVATE</button>
+            </div>
+            <script>
+                async function activate() {
+                    const res = await fetch('/api/activate-account', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({username: '{{user}}', password: document.getElementById('pw').value})
+                    });
+                    const data = await res.json();
+                    alert(data.message);
+                    if(data.status === 'success') window.location.href = '/';
+                }
+            </script>
+        </body></html>
+    ''', user=username)
 
+@app.route('/api/activate-account', methods=['POST'])
+def activate_account():
+    data = request.json
+    conn = get_db_connection()
+    conn.execute('UPDATE users SET password = ?, status = "active" WHERE username = ?',
+                 (data['password'], data['username']))
+    conn.commit()
+    conn.close()
+    return jsonify({"status": "success", "message": "Account activated!"})
 @app.route('/')
 def home():
     try:

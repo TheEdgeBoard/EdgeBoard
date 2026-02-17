@@ -90,15 +90,30 @@
     </div>
 
     <div id="reg-modal" class="fixed inset-0 bg-black/80 hidden flex items-center justify-center p-4 z-[100]">
-        <div class="bg-gray-900 border border-gray-700 p-8 rounded-2xl w-full max-w-sm shadow-2xl">
-            <h3 class="orbitron text-lg mb-6 tracking-tighter">Register</h3>
-            <input id="r-user" type="text" placeholder="Username" class="w-full bg-gray-800 border border-gray-700 p-3 rounded mb-3 text-white">
-            <input id="r-pass" type="password" placeholder="Password" class="w-full bg-gray-800 border border-gray-700 p-3 rounded mb-6 text-white">
-            <button onclick="auth('register')" class="w-full bg-blue-600 text-white font-bold py-3 rounded">CREATE ACCOUNT</button>
-            <button onclick="closeModal('reg-modal')" class="w-full text-gray-500 text-xs mt-4">Cancel</button>
+        <div class="bg-gray-900 border border-gray-700 p-8 rounded-2xl w-full max-w-md shadow-2xl">
+        <h3 class="orbitron text-lg mb-6">Request Access</h3>
+        <input id="r-name" type="text" placeholder="Full Name" class="w-full bg-gray-800 border border-gray-700 p-3 rounded mb-3 text-white">
+        <input id="r-email" type="email" placeholder="Email Address" class="w-full bg-gray-800 border border-gray-700 p-3 rounded mb-3 text-white">
+        <input id="r-user" type="text" placeholder="Requested Username" class="w-full bg-gray-800 border border-gray-700 p-3 rounded mb-6 text-white">
+        <button onclick="requestAccess()" class="w-full bg-blue-600 text-white font-bold py-3 rounded">SUBMIT REQUEST</button>
+        <button onclick="closeModal('reg-modal')" class="w-full text-gray-500 text-xs mt-4">Cancel</button>
         </div>
     </div>
-
+async function requestAccess() {
+    const payload = {
+        full_name: document.getElementById('r-name').value,
+        email: document.getElementById('r-email').value,
+        requested_username: document.getElementById('r-user').value
+    };
+    const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    alert(data.message);
+    if(data.status === 'success') closeModal('reg-modal');
+}
     <script>
         async function auth(type) {
             const user = document.getElementById(type === 'login' ? 'l-user' : 'r-user').value;
