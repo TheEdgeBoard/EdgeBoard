@@ -243,27 +243,39 @@
              return;
         }
 
-        const rows = filtered.map(d => `
+        const rows = filtered.map(d => {
+            // --- NEW: Calculate the win rate properly to replace NaN% ---
+            let winRateStr = "TBD";
+            if (d.trend_history) {
+                const arr = d.trend_history.split(',').map(Number).slice(0, trendWin);
+                const hits = arr.reduce((a,b) => a + b, 0);
+                const pct = (hits / arr.length) * 100;
+                winRateStr = pct.toFixed(0) + "%";
+            }
+
+            // --- FIXED: Updated variable names to match active_lines table ---
+            return `
             <tr class="border-b border-gray-800 hover:bg-emerald-500/5 transition-colors">
                 <td class="p-5 font-bold text-white">
                     ${d.player_name} 
-                    <div class="text-[10px] text-gray-500 font-normal">${d.team_name || 'NBA'}</div>
+                    <div class="text-[10px] text-gray-500 font-normal">${d.team || 'NBA'}</div>
                 </td>
                 <td class="p-5">
                     <div class="text-[10px] text-gray-500 uppercase">${d.prop_type}</div>
-                    <div class="text-emerald-400 font-bold">${d.suggestion} ${d.market_line}</div>
+                    <div class="text-emerald-400 font-bold">OVER ${d.line_value}</div>
                 </td>
-                <td class="p-5 text-center text-blue-400 font-black">${(d.win_rate_10*100).toFixed(0)}%</td>
-                <td class="p-5 text-center text-emerald-400 font-black">+${(d.ev_10 || 0).toFixed(1)}%</td>
+                <td class="p-5 text-center text-blue-400 font-black">${winRateStr}</td>
+                <td class="p-5 text-center text-emerald-400 font-black">-</td>
                 <td class="p-5 text-center">
-                    <div class="text-white font-bold text-xs">${d.best_odds || '-'}</div>
-                    <div class="text-[9px] text-gray-500 uppercase">${d.sportsbook || 'Market'}</div>
+                    <div class="text-white font-bold text-xs">${d.odds_over || '-'}</div>
+                    <div class="text-[9px] text-gray-500 uppercase">${d.merchant_name || 'Market'}</div>
                 </td>
                 <td class="p-5 text-right">
                     <button onclick="hideBet('${d.player_name}')" class="text-[10px] text-gray-600 hover:text-red-500 font-bold transition-colors">HIDE</button>
                 </td>
             </tr>
-        `).join('');
+            `;
+        }).join('');
         
         body.innerHTML = rows;
     } 
