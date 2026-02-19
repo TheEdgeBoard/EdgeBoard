@@ -11,7 +11,22 @@ def sync_stats():
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    # --- 1. SAFEGUARD: Add missing columns if they don't exist yet ---
+    # --- 1. SAFEGUARD: Build missing tables & columns on the live server ---
+    # Create player_logs if it doesn't exist
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS player_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            player_name TEXT,
+            game_date TEXT,
+            pts INTEGER,
+            reb INTEGER,
+            ast INTEGER,
+            threes_made INTEGER,
+            minutes_played INTEGER
+        )
+    ''')
+    conn.commit()
+
     try:
         cursor.execute("ALTER TABLE active_lines ADD COLUMN trend_history TEXT")
     except sqlite3.OperationalError:
