@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, render_template_string
+from flask import Flask, jsonify, request, render_template_string, session # <--- Added session
 import sqlite3
 import os
 import sys
@@ -6,9 +6,10 @@ import subprocess
 
 # --- CONFIGURATION ---
 BASE_DIR = '/home/TheEdgeBoard/EdgeBoard/'
-sys.path.append(BASE_DIR)  # <--- CRITICAL: Allows importing your local scripts
+sys.path.append(BASE_DIR)
 
 app = Flask(__name__)
+app.secret_key = 'change_this_to_a_random_secret_string' # <--- CRITICAL: Required for login sessions
 DB_PATH = os.path.join(BASE_DIR, 'edgeboard.db')
 
 # --- IMPORT YOUR SCRIPTS ---
@@ -36,7 +37,17 @@ def about_page():
 @app.route('/')
 def home():
     try:
-        return open(os.path.join(BASE_DIR, 'index.html'), encoding='utf-8').read()
+        # --- NEW: Check if Admin is logged in ---
+        is_admin = False
+        if session.get('logged_in') and session.get('role') == 'admin':
+            is_admin = True
+            
+        # Read the file manually since it is in the root folder
+        html_content = open(os.path.join(BASE_DIR, 'index.html'), encoding='utf-8').read()
+        
+        # Use render_template_string to inject the 'is_admin' variable into the HTML
+        return render_template_string(html_content, is_admin=is_admin)
+        
     except Exception as e:
         return f"Error loading site: {str(e)}"
 
@@ -49,9 +60,15 @@ def login():
         user = conn.execute('SELECT * FROM users WHERE username = ?', (data['username'],)).fetchone()
         conn.close()
         
-        # Simple password check (In production, use hashing!)
+        # Simple password check
         if user and user['password'] == data['password']:
+            # --- NEW: Save user info to Session ---
+            session['username'] = user['username']
+            session['role'] = user['role']
+            session['logged_in'] = True
+            # --------------------------------------
             return jsonify({"status": "success", "role": user['role'], "username": user['username']})
+        
         return jsonify({"status": "error", "message": "Invalid Credentials"}), 401
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
@@ -121,6 +138,48 @@ def sync_stats():
         return jsonify({"status": "success", "message": "Stats synced successfully!"}) 
     except Exception as e: 
         return jsonify({"status": "error", "message": str(e)})
+# ==========================================
+# ADMIN USER MANAGEMENT SECTION
+# ==========================================
 
+@app.route('/admin/users')
+def manage_users():
+    # TIP: To secure this page, uncomment the lines below:
+    # if 'user_id' not in session: return redirect(url_for('login'))
+    
+    conn = sqlite3.connect('edgeboard.db') # Or use DB_PATH variable if you have one defined
+    cursor = conn.cursor()
+    
+    try:
+        # We select specific columns to match the HTML table order
+        query = "SELECT id, full_name, email, username, access_level, password_hash FROM users"
+        cursor.execute(query)
+        users = cursor.fetchall()
+    except Exception as e:
+        print(f"Error fetching users: {e}")
+        users = []
+    finally:
+        conn.close()
+
+    return render_template('admin_users.html', users=users)
+
+
+@app.route('/admin/delete_user/<int:user_id>', methods=['POST'])
+def delete_user(user_id):
+    # TIP: Security check should go here too
+    
+    conn = sqlite3.connect('edgeboard.db')
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        conn.commit()
+        print(f"Deleted user ID: {user_id}")
+    except Exception as e:
+        print(f"Error deleting user: {e}")
+    finally:
+        conn.close()
+
+    return redirect(url_for('manage_users'))
 if __name__ == '__main__':
     app.run(debug=True)
