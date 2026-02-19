@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, render_template_string, session # <--- Added session
+from flask import Flask, jsonify, request, render_template, render_template_string, session
 import sqlite3
 import os
 import sys
