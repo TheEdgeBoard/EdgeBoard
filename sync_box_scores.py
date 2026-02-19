@@ -1,11 +1,14 @@
+import requests
 import sqlite3
-import time
-import pandas as pd
-from datetime import datetime, timedelta
-from nba_api.stats.endpoints import playergamelog
-from nba_api.stats.static import players
+import os
+import sys
+from datetime import datetime
 
-DB_PATH = '/home/TheEdgeBoard/EdgeBoard/edgeboard.db'
+# ... your API Keys and config ...
+
+# --- DYNAMIC DB PATH ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, 'edgeboard.db')
 
 def sync_box_scores():
     print("Starting Box Score Sync...")
@@ -63,7 +66,7 @@ def sync_box_scores():
                 continue
 
             cursor.execute("DELETE FROM player_logs WHERE player_name = ?", (player_name,))
-            recent_games = log.head(7) 
+            recent_games = log.head(14) 
             
             for _, row in recent_games.iterrows():
                 cursor.execute('''
