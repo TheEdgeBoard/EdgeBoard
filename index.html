@@ -220,6 +220,16 @@
         renderTable();
     }
 
+    // --- NEW: Convert Decimal to American Odds for the UI ---
+    function formatAmericanOdds(dec) {
+        if (!dec || dec <= 1) return '-';
+        if (dec >= 2.0) {
+            return '+' + Math.round((dec - 1) * 100);
+        } else {
+            return Math.round(-100 / (dec - 1)).toString();
+        }
+    }
+
     function renderTable() {
         const body = document.getElementById('table-body');
         body.innerHTML = '';
@@ -228,7 +238,6 @@
             if(localStorage.getItem(`hide_${d.player_name}`)) return false;
             
             if(!d.trend_history) return true; 
-            // Parses "1,0,1,1..." string
             const hits = d.trend_history.split(',').map(Number).slice(0, trendWin).reduce((a,b)=>a+b, 0);
             
             if(trendWin === 3 && hits < 2) return false;
@@ -244,7 +253,6 @@
         }
 
         const rows = filtered.map(d => {
-            // --- NEW: Calculate the win rate properly to replace NaN% ---
             let winRateStr = "TBD";
             if (d.trend_history) {
                 const arr = d.trend_history.split(',').map(Number).slice(0, trendWin);
@@ -253,7 +261,9 @@
                 winRateStr = pct.toFixed(0) + "%";
             }
 
-            // --- FIXED: Updated variable names to match active_lines table ---
+            // --- Apply the conversion here ---
+            const americanOdds = formatAmericanOdds(d.odds_over);
+
             return `
             <tr class="border-b border-gray-800 hover:bg-emerald-500/5 transition-colors">
                 <td class="p-5 font-bold text-white">
@@ -267,7 +277,7 @@
                 <td class="p-5 text-center text-blue-400 font-black">${winRateStr}</td>
                 <td class="p-5 text-center text-emerald-400 font-black">-</td>
                 <td class="p-5 text-center">
-                    <div class="text-white font-bold text-xs">${d.odds_over || '-'}</div>
+                    <div class="text-white font-bold text-xs">${americanOdds}</div>
                     <div class="text-[9px] text-gray-500 uppercase">${d.merchant_name || 'Market'}</div>
                 </td>
                 <td class="p-5 text-right">
