@@ -19,88 +19,119 @@ DB_PATH = '/home/TheEdgeBoard/EdgeBoard/edgeboard.db'
 def sync_odds():
     print(f"Fetching expanded prop markets for {SPORT}...")
 
-    # 1. Fetch the Games
-    url = f'https://api.the-odds-api.com/v4/sports/{SPORT}/odds'
-    params = {
+    # --- STEP 1: Get the Schedule (Game IDs only) ---
+    # We use the /events endpoint first to get the list of Game IDs.
+    # This endpoint DOES NOT return odds, but it avoids the "Market Error".
+    schedule_url = f'https://api.the-odds-api.com/v4/sports/{SPORT}/events'
+    schedule_params = {
         'api_key': API_KEY,
         'regions': REGIONS,
-        'markets': MARKETS,
-        'oddsFormat': ODDS_FORMAT,
         'dateFormat': DATE_FORMAT,
     }
 
     try:
-        response = requests.get(url, params=params)
+        # Fetch Schedule
+        sched_response = requests.get(schedule_url, params=schedule_params)
         
-        # --- FIX 1: Return Error to Website if API Fails ---
-        if response.status_code != 200:
-            print(f"API Error: {response.status_code} - {response.text}")
-            return {"status": "error", "message": f"API Error {response.status_code}: {response.text}"}
+        if sched_response.status_code != 200:
+            print(f"Schedule API Error: {sched_response.status_code} - {sched_response.text}")
+            return {"status": "error", "message": f"Schedule Error {sched_response.status_code}"}
 
-        data = response.json()
-        if not data:
+        schedule_data = sched_response.json()
+        
+        if not schedule_data:
             print("No games scheduled today.")
             return {"status": "error", "message": "No games scheduled today."}
 
+        # Connect to DB and Clear Old Data
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
+        cursor.execute('DELETE FROM daily_prospects')
+        conn.commit()
 
-        # Clear old odds
-        cursor.execute('DELETE FROM daily_prospects') 
-
-        print(f"Processing {len(data)} games...")
+        print(f"Found {len(schedule_data)} games. Starting Prop Sync (this may take a moment)...")
         count = 0 
 
-        for game in data:
-            game_id = game['id']
-            home_team = game['home_team']
-            away_team = game['away_team']
+        # --- STEP 2: Loop through each game to get Player Props ---
+        for game_summary in schedule_data:
+            game_id = game_summary['id']
+            home_team = game_summary['home_team']
+            away_team = game_summary['away_team']
+            
+            # Construct URL for THIS specific game
+            # This is the fix: Using /events/{id}/odds instead of the bulk endpoint
+            prop_url = f'https://api.the-odds-api.com/v4/sports/{SPORT}/events/{game_id}/odds'
+            prop_params = {
+                'api_key': API_KEY,
+                'regions': REGIONS,
+                'markets': MARKETS, # Requesting player props here is allowed!
+                'oddsFormat': ODDS_FORMAT,
+                'dateFormat': DATE_FORMAT,
+            }
 
-            for bookmaker in game['bookmakers']:
-                # Filter for major books
-                if bookmaker['key'] not in ['draftkings', 'fanduel', 'mgm', 'caesars']:
+            try:
+                # Fetch Props for this single game
+                prop_response = requests.get(prop_url, params=prop_params)
+                
+                # Skip if this specific game fails, but don't crash the whole loop
+                if prop_response.status_code != 200:
+                    print(f"Skipping game {home_team} vs {away_team}: {prop_response.status_code}")
                     continue
+                
+                game_data = prop_response.json()
 
-                for market in bookmaker['markets']:
-                    market_key = market['key'] 
+                # --- STEP 3: Parse the Data (Your Original Logic) ---
+                # game_data is now a single object, not a list, so we access 'bookmakers' directly
+                for bookmaker in game_data.get('bookmakers', []):
                     
-                    # Map API keys to readable Prop Types
-                    prop_map = {
-                        'player_points': 'PTS',
-                        'player_rebounds': 'REB',
-                        'player_assists': 'AST',
-                        'player_threes': 'FG3M', 
-                        'player_points_rebounds_assists': 'PRA',
-                        'player_points_rebounds': 'PR',
-                        'player_rebounds_assists': 'RA'
-                    }
-                    
-                    prop_type = prop_map.get(market_key)
-                    if not prop_type: continue
+                    # Filter for major books
+                    if bookmaker['key'] not in ['draftkings', 'fanduel', 'mgm', 'caesars']:
+                        continue
 
-                    for outcome in market['outcomes']:
-                        player_name = outcome['description']
-                        line = outcome.get('point')
-                        if not line: continue
+                    for market in bookmaker['markets']:
+                        market_key = market['key'] 
                         
-                        price = outcome.get('price', 0)
+                        # Map API keys to readable Prop Types
+                        prop_map = {
+                            'player_points': 'PTS',
+                            'player_rebounds': 'REB',
+                            'player_assists': 'AST',
+                            'player_threes': 'FG3M', 
+                            'player_points_rebounds_assists': 'PRA',
+                            'player_points_rebounds': 'PR',
+                            'player_rebounds_assists': 'RA'
+                        }
+                        
+                        prop_type = prop_map.get(market_key)
+                        if not prop_type: continue
 
-                        cursor.execute('''
-                            INSERT INTO daily_prospects (
-                                player_name, team_id, opponent_id, prop_type, market_line, best_odds,
-                                hits_last_3_over, hits_last_3_under, avg_last_3,
-                                hits_last_5_over, hits_last_5_under, avg_last_5,
-                                hits_last_10_over, hits_last_10_under, avg_last_10,
-                                hits_last_14_over, hits_last_14_under, avg_last_14
-                            ) VALUES (?, ?, ?, ?, ?, ?, 0,0,0, 0,0,0, 0,0,0, 0,0,0)
-                        ''', (player_name, home_team, away_team, prop_type, line, price))
-                        count += 1
+                        for outcome in market['outcomes']:
+                            player_name = outcome['description']
+                            line = outcome.get('point')
+                            if not line: continue
+                            
+                            price = outcome.get('price', 0)
 
+                            cursor.execute('''
+                                INSERT INTO daily_prospects (
+                                    player_name, team_id, opponent_id, prop_type, market_line, best_odds,
+                                    hits_last_3_over, hits_last_3_under, avg_last_3,
+                                    hits_last_5_over, hits_last_5_under, avg_last_5,
+                                    hits_last_10_over, hits_last_10_under, avg_last_10,
+                                    hits_last_14_over, hits_last_14_under, avg_last_14
+                                ) VALUES (?, ?, ?, ?, ?, ?, 0,0,0, 0,0,0, 0,0,0, 0,0,0)
+                            ''', (player_name, home_team, away_team, prop_type, line, price))
+                            count += 1
+            
+            except Exception as e_game:
+                print(f"Error processing game {game_id}: {e_game}")
+                continue
+
+        # Final Commit after all games are processed
         conn.commit()
         conn.close()
         
-        # --- FIX 2: Return Success Message ---
-        msg = f"Successfully synced {count} props."
+        msg = f"Successfully synced {count} props from {len(schedule_data)} games."
         print(msg)
         return {"status": "success", "message": msg}
 
