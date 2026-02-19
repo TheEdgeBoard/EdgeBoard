@@ -144,15 +144,14 @@ def sync_stats():
 
 @app.route('/admin/users')
 def manage_users():
-    # TIP: To secure this page, uncomment the lines below:
-    # if 'user_id' not in session: return redirect(url_for('login'))
-    
-    conn = sqlite3.connect('edgeboard.db') # Or use DB_PATH variable if you have one defined
+    # We use DB_PATH here so it finds your REAL database file
+    conn = sqlite3.connect(DB_PATH) 
     cursor = conn.cursor()
     
     try:
-        # We select specific columns to match the HTML table order
-        query = "SELECT id, full_name, email, username, access_level, password_hash FROM users"
+        # Match the columns exactly to your database screenshot
+        # rowid is used as a safe 'id' column
+        query = "SELECT rowid, full_name, email, username, access_level, password_hash FROM users"
         cursor.execute(query)
         users = cursor.fetchall()
     except Exception as e:
@@ -162,6 +161,25 @@ def manage_users():
         conn.close()
 
     return render_template('admin_users.html', users=users)
+
+
+@app.route('/admin/delete_user/<int:user_id>', methods=['POST'])
+def delete_user(user_id):
+    # Again, use DB_PATH to ensure we are deleting from the correct file
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        # We use rowid here to match the query above
+        cursor.execute("DELETE FROM users WHERE rowid = ?", (user_id,))
+        conn.commit()
+        print(f"Deleted user ID: {user_id}")
+    except Exception as e:
+        print(f"Error deleting user: {e}")
+    finally:
+        conn.close()
+
+    return redirect(url_for('manage_users'))
 
 
 @app.route('/admin/delete_user/<int:user_id>', methods=['POST'])
