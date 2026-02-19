@@ -17,7 +17,8 @@ DB_PATH = os.path.join(BASE_DIR, 'edgeboard.db')
 # --- IMPORT YOUR SCRIPTS ---
 try:
     from sync_odds import sync_odds as run_sync_odds
-    from sync_stats import sync_stats as run_sync_stats  # <-- NEW LINE
+    from sync_stats import sync_stats as run_sync_stats
+    from sync_box_scores import sync_box_scores as run_sync_box_scores # <-- THE NEW BOX SCORE LINE
 except ImportError:
     print("Warning: Sync scripts not found or have errors.")
 
@@ -139,6 +140,14 @@ def sync_stats_route(): # Renamed slightly to avoid conflicts
     except Exception as e: 
         # Now if it crashes, it will tell us exactly WHY on your screen!
         return jsonify({"status": "error", "message": str(e)})
+
+@app.route('/api/sync/box_scores', methods=['POST'])
+def sync_box_scores_route():
+    try:
+        result = run_sync_box_scores() 
+        return jsonify(result)
+    except Exception as e: 
+        return jsonify({"status": "error", "message": str(e)})   
 # ==========================================
 # ADMIN USER MANAGEMENT SECTION
 # ==========================================
