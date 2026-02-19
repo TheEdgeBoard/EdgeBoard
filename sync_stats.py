@@ -35,6 +35,11 @@ def sync_stats():
     try:
         cursor.execute("ALTER TABLE active_lines ADD COLUMN last_game_hit INTEGER")
     except sqlite3.OperationalError:
+        pass 
+        
+    try:
+        cursor.execute("ALTER TABLE active_lines ADD COLUMN last_game_hit INTEGER")
+    except sqlite3.OperationalError:
         pass
 
     # ====================================================================
