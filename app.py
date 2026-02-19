@@ -9,7 +9,7 @@ BASE_DIR = '/home/TheEdgeBoard/EdgeBoard/'
 sys.path.append(BASE_DIR)
 
 app = Flask(__name__)
-app.secret_key = 'change_this_to_a_random_secret_string' # <--- CRITICAL: Required for login sessions
+app.secret_key = 'any_random_words_here'
 DB_PATH = os.path.join(BASE_DIR, 'edgeboard.db')
 
 # --- IMPORT YOUR SCRIPTS ---
