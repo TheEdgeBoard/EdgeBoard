@@ -104,7 +104,7 @@ def get_data():
     conn = get_db_connection()
     # Simplified Query to prevent crashes if columns are missing
     query = '''
-        SELECT * FROM daily_prospects
+        SELECT * FROM active_lines
     '''
     try:
         results = conn.execute(query).fetchall()
