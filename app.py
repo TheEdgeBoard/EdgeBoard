@@ -190,5 +190,79 @@ def delete_user(user_id):
         conn.close()
 
     return redirect(url_for('manage_users'))
+@app.route('/admin/db')
+def view_database():
+    # SECURITY: Only let Admins see the raw database
+    if not session.get('logged_in') or session.get('role') != 'admin':
+        return "Unauthorized. Please log in as an Admin.", 403
+
+    conn = get_db_connection()
+    try:
+        # Fetch the top 100 rows so it doesn't crash your browser if the DB gets huge
+        active_lines = conn.execute("SELECT * FROM active_lines ORDER BY player_name LIMIT 100").fetchall()
+        player_logs = conn.execute("SELECT * FROM player_logs ORDER BY id DESC LIMIT 100").fetchall()
+    except Exception as e:
+        return f"Database Error: {e}"
+    finally:
+        conn.close()
+
+    # Build a simple, dark-mode HTML table to display the data
+    html = """
+    <body style="background:#0f172a;color:white;padding:20px;font-family:sans-serif;">
+        <div style="max-width: 1200px; margin: auto;">
+            <h1 style="color:#10b981;">Database Viewer (Live)</h1>
+            <a href="/" style="color:#3b82f6; text-decoration: none; font-weight: bold;">&larr; Back to Dashboard</a>
+            
+            <h2 style="margin-top: 30px; color: #94a3b8;">active_lines (Top 100)</h2>
+            <div style="overflow-x:auto; border: 1px solid #334155; border-radius: 8px;">
+                <table style="width: 100%; text-align: left; border-collapse: collapse; font-size: 14px;">
+                    <tr style="background: #1e293b; border-bottom: 1px solid #334155;">
+                        <th style="padding: 10px;">Player</th>
+                        <th style="padding: 10px;">Prop</th>
+                        <th style="padding: 10px;">Line</th>
+                        <th style="padding: 10px;">Best Odds</th>
+                        <th style="padding: 10px;">Trend History</th>
+                    </tr>
+                    {% for row in active_lines %}
+                    <tr style="border-bottom: 1px solid #334155;">
+                        <td style="padding: 10px;">{{ row['player_name'] }}</td>
+                        <td style="padding: 10px;">{{ row['prop_type'] }}</td>
+                        <td style="padding: 10px;">{{ row['line_value'] }}</td>
+                        <td style="padding: 10px;">{{ row['odds_over'] }}</td>
+                        <td style="padding: 10px;">{{ row['trend_history'] }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+
+            <h2 style="margin-top: 40px; color: #94a3b8;">player_logs (Recent 100)</h2>
+            <div style="overflow-x:auto; border: 1px solid #334155; border-radius: 8px;">
+                <table style="width: 100%; text-align: left; border-collapse: collapse; font-size: 14px;">
+                    <tr style="background: #1e293b; border-bottom: 1px solid #334155;">
+                        <th style="padding: 10px;">ID</th>
+                        <th style="padding: 10px;">Player</th>
+                        <th style="padding: 10px;">Date</th>
+                        <th style="padding: 10px;">PTS</th>
+                        <th style="padding: 10px;">REB</th>
+                        <th style="padding: 10px;">AST</th>
+                        <th style="padding: 10px;">3PM</th>
+                    </tr>
+                    {% for row in player_logs %}
+                    <tr style="border-bottom: 1px solid #334155;">
+                        <td style="padding: 10px; color: #64748b;">{{ row['id'] }}</td>
+                        <td style="padding: 10px; font-weight: bold;">{{ row['player_name'] }}</td>
+                        <td style="padding: 10px;">{{ row['game_date'] }}</td>
+                        <td style="padding: 10px;">{{ row['pts'] }}</td>
+                        <td style="padding: 10px;">{{ row['reb'] }}</td>
+                        <td style="padding: 10px;">{{ row['ast'] }}</td>
+                        <td style="padding: 10px;">{{ row['threes_made'] }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+        </div>
+    </body>
+    """
+    return render_template_string(html, active_lines=active_lines, player_logs=player_logs)
 if __name__ == '__main__':
     app.run(debug=True)
