@@ -198,9 +198,9 @@ def view_database():
 
     conn = get_db_connection()
     try:
-        # Fetch the top 100 rows so it doesn't crash your browser if the DB gets huge
-        active_lines = conn.execute("SELECT * FROM active_lines ORDER BY player_name LIMIT 100").fetchall()
-        player_logs = conn.execute("SELECT * FROM player_logs ORDER BY id DESC LIMIT 100").fetchall()
+        # Removed the LIMIT keyword so it pulls the entire table
+        active_lines = conn.execute("SELECT * FROM active_lines ORDER BY player_name").fetchall()
+        player_logs = conn.execute("SELECT * FROM player_logs ORDER BY id DESC").fetchall()
     except Exception as e:
         return f"Database Error: {e}"
     finally:
