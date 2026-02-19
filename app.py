@@ -14,10 +14,12 @@ DB_PATH = os.path.join(BASE_DIR, 'edgeboard.db')
 
 # --- IMPORT YOUR SCRIPTS ---
 # This connects the 'sync_odds.py' return values to this app
+# --- IMPORT YOUR SCRIPTS ---
 try:
     from sync_odds import sync_odds as run_sync_odds
+    from sync_stats import sync_stats as run_sync_stats  # <-- NEW LINE
 except ImportError:
-    print("Warning: sync_odds.py not found or has errors.")
+    print("Warning: Sync scripts not found or have errors.")
 
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
@@ -129,14 +131,13 @@ def sync_odds_route():
         return jsonify({"status": "error", "message": str(e)})
 
 @app.route('/api/sync/stats', methods=['POST'])
-def sync_stats():
+def sync_stats_route(): # Renamed slightly to avoid conflicts
     try:
-        # We still use subprocess here since we haven't updated sync_stats.py yet
-        subprocess.run(["/usr/bin/python3", os.path.join(BASE_DIR, "sync_stats.py")], check=True)
-        
-        # Manually add the message so the frontend doesn't say "undefined"
+        # Call the function directly just like odds!
+        run_sync_stats() 
         return jsonify({"status": "success", "message": "Stats synced successfully!"}) 
     except Exception as e: 
+        # Now if it crashes, it will tell us exactly WHY on your screen!
         return jsonify({"status": "error", "message": str(e)})
 # ==========================================
 # ADMIN USER MANAGEMENT SECTION
