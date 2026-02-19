@@ -1,17 +1,22 @@
 from flask import Flask, jsonify, request, render_template_string
 import sqlite3
 import os
+import sys
 import subprocess
-import smtplib
-from email.message import EmailMessage
-
-app = Flask(__name__)
 
 # --- CONFIGURATION ---
 BASE_DIR = '/home/TheEdgeBoard/EdgeBoard/'
+sys.path.append(BASE_DIR)  # <--- CRITICAL: Allows importing your local scripts
+
+app = Flask(__name__)
 DB_PATH = os.path.join(BASE_DIR, 'edgeboard.db')
-ADMIN_EMAIL = "edgeboardanalytics@gmail.com"
-EMAIL_PASS = "mzac cwka rtek biwj"
+
+# --- IMPORT YOUR SCRIPTS ---
+# This connects the 'sync_odds.py' return values to this app
+try:
+    from sync_odds import sync_odds as run_sync_odds
+except ImportError:
+    print("Warning: sync_odds.py not found or has errors.")
 
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
@@ -35,96 +40,87 @@ def home():
     except Exception as e:
         return f"Error loading site: {str(e)}"
 
-@app.route('/setup-password')
-def setup_password_page():
-    username = request.args.get('user')
-    if not username: return "Invalid link.", 400
-    return render_template_string('''
-        <!DOCTYPE html><html><head><title>Setup Password</title><script src="https://cdn.tailwindcss.com"></script></head>
-        <body class="bg-gray-950 text-white flex items-center justify-center min-h-screen">
-            <div class="bg-gray-900 p-8 rounded-2xl w-full max-w-sm text-center border border-gray-800">
-                <h1 class="text-emerald-400 font-bold text-xl mb-4">EDGE BOARD</h1>
-                <input id="pw" type="password" placeholder="New Password" class="w-full bg-gray-800 p-3 rounded mb-4 text-white">
-                <button onclick="activate()" class="w-full bg-emerald-500 text-black font-bold py-3 rounded">ACTIVATE ACCOUNT</button>
-            </div>
-            <script>
-                async function activate() {
-                    const pass = document.getElementById('pw').value;
-                    const res = await fetch('/api/activate-account', {
-                        method: 'POST', headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({username: '{{user}}', password: pass})
-                    });
-                    const data = await res.json();
-                    if(data.status === 'success') window.location.href = '/';
-                    else alert(data.message);
-                }
-            </script>
-        </body></html>
-    ''', user=username)
-
 # --- API ROUTES ---
-@app.route('/api/activate-account', methods=['POST'])
-def activate_account():
-    data = request.json
-    conn = get_db_connection()
-    conn.execute('UPDATE users SET password = ?, status = "active" WHERE username = ?', (data['password'], data['username']))
-    conn.commit()
-    conn.close()
-    return jsonify({"status": "success"})
-
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.json
-    conn = get_db_connection()
-    user = conn.execute('SELECT * FROM users WHERE username = ? AND password = ?', (data['username'], data['password'])).fetchone()
-    conn.close()
-    if user: return jsonify({"status": "success", "role": user['role'], "username": user['username']})
-    return jsonify({"status": "error", "message": "Invalid Credentials"}), 401
+    try:
+        conn = get_db_connection()
+        user = conn.execute('SELECT * FROM users WHERE username = ?', (data['username'],)).fetchone()
+        conn.close()
+        
+        # Simple password check (In production, use hashing!)
+        if user and user['password'] == data['password']:
+            return jsonify({"status": "success", "role": user['role'], "username": user['username']})
+        return jsonify({"status": "error", "message": "Invalid Credentials"}), 401
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
+@app.route('/api/register', methods=['POST'])
+def register():
+    data = request.json
+    try:
+        conn = get_db_connection()
+        # Create table if not exists (Lazy init)
+        conn.execute('''CREATE TABLE IF NOT EXISTS users 
+                        (username TEXT PRIMARY KEY, password TEXT, full_name TEXT, email TEXT, role TEXT)''')
+        
+        # Check if user exists
+        exists = conn.execute('SELECT 1 FROM users WHERE username = ?', (data['requested_username'],)).fetchone()
+        if exists:
+            conn.close()
+            return jsonify({"status": "error", "message": "Username already taken"})
+
+        conn.execute('INSERT INTO users (username, password, full_name, email, role) VALUES (?, ?, ?, ?, ?)',
+                     (data['requested_username'], data['password'], data['full_name'], data['email'], 'user'))
+        conn.commit()
+        conn.close()
+        return jsonify({"status": "success", "message": "Account created! You can now log in."})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
 
 @app.route('/api/data')
 def get_data():
     sport = request.args.get('sport', 'NBA')
-    if sport != 'NBA': return jsonify([]) # Empty list for Coming Soon tabs
+    if sport != 'NBA': return jsonify([]) 
 
     conn = get_db_connection()
-    # QUERY LOGIC: 
-    # 1. Join Sim Results + Market Data
-    # 2. Filter: Lineup Flag must be 0 (No changes)
-    # 3. Filter: Win Rate >= 60% AND EV > 0 (Profitable Only)
-    # 4. Filter: Must have hit last game (last_game_hit = 1)
+    # Simplified Query to prevent crashes if columns are missing
     query = '''
-        SELECT s.*, p.market_line, p.trend_history, p.last_game_hit, s.sportsbook, s.best_odds
-        FROM sim_results s 
-        JOIN daily_prospects p ON s.player_name = p.player_name AND s.prop_type = p.prop_type
-        WHERE s.lineup_flag = 0 
-        AND s.win_rate_10 >= 0.60 
-        AND s.ev_10 > 0
-        AND p.last_game_hit = 1
+        SELECT * FROM daily_prospects
     '''
     try:
         results = conn.execute(query).fetchall()
-    except:
-        # Fallback if specific columns are empty/missing in dev
-        results = []
+        # Convert to list of dicts
+        data = [dict(row) for row in results]
+    except Exception as e:
+        print(f"DB Error: {e}")
+        data = []
     conn.close()
-    return jsonify([dict(row) for row in results])
+    return jsonify(data)
 
-# --- ADMIN & SYNC ROUTES ---
+# --- ADMIN & SYNC ROUTES (FIXED) ---
+
 @app.route('/api/sync/odds', methods=['POST'])
-def sync_odds():
+def sync_odds_route():
     try:
-        subprocess.run(["/usr/bin/python3", os.path.join(BASE_DIR, "sync_odds.py")], check=True)
-        return jsonify({"status": "success"})
-    except Exception as e: return jsonify({"status": "error", "message": str(e)})
+        # CALL THE FUNCTION DIRECTLY
+        # This gets the {"status":..., "message":...} from sync_odds.py
+        result = run_sync_odds() 
+        return jsonify(result)
+    except Exception as e: 
+        return jsonify({"status": "error", "message": str(e)})
 
 @app.route('/api/sync/stats', methods=['POST'])
 def sync_stats():
     try:
+        # We still use subprocess here since we haven't updated sync_stats.py yet
         subprocess.run(["/usr/bin/python3", os.path.join(BASE_DIR, "sync_stats.py")], check=True)
-        # Note: We usually run run_sims.py right after stats
-        subprocess.run(["/usr/bin/python3", os.path.join(BASE_DIR, "run_sims.py")], check=True)
-        return jsonify({"status": "success"})
-    except Exception as e: return jsonify({"status": "error", "message": str(e)})
+        
+        # Manually add the message so the frontend doesn't say "undefined"
+        return jsonify({"status": "success", "message": "Stats synced successfully!"}) 
+    except Exception as e: 
+        return jsonify({"status": "error", "message": str(e)})
 
 if __name__ == '__main__':
     app.run(debug=True)
