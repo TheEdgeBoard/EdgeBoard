@@ -43,6 +43,21 @@ def sync_odds():
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
 
+        # --- NEW: Build the table on the live server if it is missing ---
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS active_lines (
+                player_name TEXT,
+                team TEXT,
+                opponent TEXT,
+                prop_type TEXT,
+                line_value REAL,
+                odds_over REAL,
+                game_time TEXT,
+                merchant_name TEXT,
+                last_updated TEXT
+            )
+        ''')
+
         # MATCHES YOUR DATABASE: Clear the active_lines table
         cursor.execute('DELETE FROM active_lines')
         conn.commit()
