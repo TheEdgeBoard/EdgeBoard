@@ -165,32 +165,13 @@ def manage_users():
 
 @app.route('/admin/delete_user/<int:user_id>', methods=['POST'])
 def delete_user(user_id):
-    # Again, use DB_PATH to ensure we are deleting from the correct file
+    # Use DB_PATH to ensure we are deleting from the correct file
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     try:
-        # We use rowid here to match the query above
+        # We use rowid here to match the ID displayed in your table
         cursor.execute("DELETE FROM users WHERE rowid = ?", (user_id,))
-        conn.commit()
-        print(f"Deleted user ID: {user_id}")
-    except Exception as e:
-        print(f"Error deleting user: {e}")
-    finally:
-        conn.close()
-
-    return redirect(url_for('manage_users'))
-
-
-@app.route('/admin/delete_user/<int:user_id>', methods=['POST'])
-def delete_user(user_id):
-    # TIP: Security check should go here too
-    
-    conn = sqlite3.connect('edgeboard.db')
-    cursor = conn.cursor()
-    
-    try:
-        cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
         conn.commit()
         print(f"Deleted user ID: {user_id}")
     except Exception as e:
