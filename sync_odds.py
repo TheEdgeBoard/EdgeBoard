@@ -5,14 +5,15 @@ import sys
 from datetime import datetime
 
 # --- CONFIGURATION ---
-API_KEY = 'e95fe4afaf21151d8ac43cfaef741522'
+API_KEY = 'e95fe4afaf21151d8ac43cfaef741522' 
 SPORT = 'basketball_nba'
 REGIONS = 'us'
+
+# YOUR ORIGINAL MARKETS LIST
 MARKETS = 'player_points,player_rebounds,player_assists,player_threes,player_points_rebounds_assists,player_points_rebounds,player_rebounds_assists'
+
 ODDS_FORMAT = 'decimal'
 DATE_FORMAT = 'iso'
-
-# Ensure this path is correct for your server
 DB_PATH = '/home/TheEdgeBoard/EdgeBoard/edgeboard.db'
 
 def sync_odds():
@@ -31,17 +32,16 @@ def sync_odds():
     try:
         response = requests.get(url, params=params)
         
+        # --- FIX 1: Return Error to Website if API Fails ---
         if response.status_code != 200:
-            error_msg = f"API Error: {response.status_code} - {response.text}"
-            print(error_msg)
-            return {"status": "error", "message": error_msg}
+            print(f"API Error: {response.status_code} - {response.text}")
+            return {"status": "error", "message": f"API Error {response.status_code}: {response.text}"}
 
         data = response.json()
         if not data:
             print("No games scheduled today.")
             return {"status": "error", "message": "No games scheduled today."}
 
-        # 2. Connect to DB
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
 
@@ -49,19 +49,20 @@ def sync_odds():
         cursor.execute('DELETE FROM daily_prospects') 
 
         print(f"Processing {len(data)} games...")
-        count = 0
+        count = 0 
 
         for game in data:
+            game_id = game['id']
             home_team = game['home_team']
             away_team = game['away_team']
 
             for bookmaker in game['bookmakers']:
-                # Filter for major US books
+                # Filter for major books
                 if bookmaker['key'] not in ['draftkings', 'fanduel', 'mgm', 'caesars']:
                     continue
 
                 for market in bookmaker['markets']:
-                    market_key = market['key']
+                    market_key = market['key'] 
                     
                     # Map API keys to readable Prop Types
                     prop_map = {
@@ -82,29 +83,30 @@ def sync_odds():
                         line = outcome.get('point')
                         if not line: continue
                         
-                        # Insert into DB
+                        price = outcome.get('price', 0)
+
                         cursor.execute('''
                             INSERT INTO daily_prospects (
-                                player_name, team_id, opponent_id, prop_type, market_line, 
+                                player_name, team_id, opponent_id, prop_type, market_line, best_odds,
                                 hits_last_3_over, hits_last_3_under, avg_last_3,
                                 hits_last_5_over, hits_last_5_under, avg_last_5,
                                 hits_last_10_over, hits_last_10_under, avg_last_10,
                                 hits_last_14_over, hits_last_14_under, avg_last_14
-                            ) VALUES (?, ?, ?, ?, ?, 0,0,0, 0,0,0, 0,0,0, 0,0,0)
-                        ''', (player_name, home_team, away_team, prop_type, line))
+                            ) VALUES (?, ?, ?, ?, ?, ?, 0,0,0, 0,0,0, 0,0,0, 0,0,0)
+                        ''', (player_name, home_team, away_team, prop_type, line, price))
                         count += 1
 
         conn.commit()
         conn.close()
         
-        success_msg = f"Successfully synced {count} props."
-        print(success_msg)
-        return {"status": "success", "message": success_msg}
+        # --- FIX 2: Return Success Message ---
+        msg = f"Successfully synced {count} props."
+        print(msg)
+        return {"status": "success", "message": msg}
 
     except Exception as e:
-        error_msg = f"Sync Crash: {str(e)}"
-        print(error_msg)
-        return {"status": "error", "message": error_msg}
+        print(f"Sync Crash: {e}")
+        return {"status": "error", "message": str(e)}
 
 if __name__ == "__main__":
     sync_odds()
