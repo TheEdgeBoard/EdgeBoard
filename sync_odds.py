@@ -9,12 +9,48 @@ API_KEY = 'bfcd3c1188c7060e3547925d9df6cd32'
 SPORT = 'basketball_nba'
 REGIONS = 'us'
 
+# Map Odds API full team names to your team_metrics abbreviations
+TEAM_MAP = {
+    "Atlanta Hawks": "ATL",
+    "Boston Celtics": "BOS",
+    "Brooklyn Nets": "BKN",
+    "Charlotte Hornets": "CHA",
+    "Chicago Bulls": "CHI",
+    "Cleveland Cavaliers": "CLE",
+    "Dallas Mavericks": "DAL",
+    "Denver Nuggets": "DEN",
+    "Detroit Pistons": "DET",
+    "Golden State Warriors": "GSW",
+    "Houston Rockets": "HOU",
+    "Indiana Pacers": "IND",
+    "Los Angeles Clippers": "LAC",
+    "Los Angeles Lakers": "LAL",
+    "Memphis Grizzlies": "MEM",
+    "Miami Heat": "MIA",
+    "Milwaukee Bucks": "MIL",
+    "Minnesota Timberwolves": "MIN",
+    "New Orleans Pelicans": "NOP",
+    "New York Knicks": "NYK",
+    "Oklahoma City Thunder": "OKC",
+    "Orlando Magic": "ORL",
+    "Philadelphia 76ers": "PHI",
+    "Phoenix Suns": "PHX",
+    "Portland Trail Blazers": "POR",
+    "Sacramento Kings": "SAC",
+    "San Antonio Spurs": "SAS",
+    "Toronto Raptors": "TOR",
+    "Utah Jazz": "UTA",
+    "Washington Wizards": "WAS"
+}
+
 # MARKETS LIST
 MARKETS = 'player_points,player_rebounds,player_assists,player_threes,player_points_rebounds_assists,player_points_rebounds,player_rebounds_assists'
 
 ODDS_FORMAT = 'decimal'
 DATE_FORMAT = 'iso'
-DB_PATH = '/home/TheEdgeBoard/EdgeBoard/edgeboard.db'
+# --- DYNAMIC DB PATH ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, 'edgeboard.db')
 
 def sync_odds():
     print(f"Fetching expanded prop markets for {SPORT}...")
@@ -46,6 +82,7 @@ def sync_odds():
         # --- NEW: Build the table on the live server if it is missing ---
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS active_lines (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, -- Ensure ID is here for deduplication
                 player_name TEXT,
                 team TEXT,
                 opponent TEXT,
@@ -58,7 +95,8 @@ def sync_odds():
             )
         ''')
 
-        # MATCHES YOUR DATABASE: Clear the active_lines table
+        # --- THIS IS THE SPOT ---
+        # Clear the active_lines table so we don't have yesterday's lines mixed in
         cursor.execute('DELETE FROM active_lines')
         conn.commit()
 
@@ -68,9 +106,18 @@ def sync_odds():
 
         for game_summary in schedule_data:
             game_id = game_summary['id']
-            # We don't know the exact player team yet, but we store the matchup
-            team = game_summary['home_team']
-            opponent = game_summary['away_team']
+    
+    # --- ADD THE MAPPING LOGIC HERE ---
+    # 1. Capture the raw names from the API FIRST
+            home_raw = game_summary['home_team']
+            away_raw = game_summary['away_team']
+    
+    # 2. Use the TEAM_MAP to convert them to abbreviations
+    # If a name isn't in the map, it will just keep the raw name
+            team = TEAM_MAP.get(home_raw, home_raw) 
+            opponent = TEAM_MAP.get(away_raw, away_raw)
+    # ----------------------------------
+            
             game_time = game_summary.get('commence_time', '')
             
             prop_url = f'https://api.the-odds-api.com/v4/sports/{SPORT}/events/{game_id}/odds'
@@ -126,14 +173,38 @@ def sync_odds():
                             cursor.execute('''
                                 INSERT INTO active_lines (
                                     player_name, team, opponent, prop_type, 
-                                    line_value, odds_over, game_time, merchant_name, last_updated
-                                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                            ''', (player_name, team, opponent, prop_type, line_value, odds_over, game_time, merchant_name, last_updated))
+        line_value, odds_over, game_time, merchant_name, last_updated
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+''', (
+    player_name, 
+    team,         # <--- These now contain the standardized 
+    opponent,     # <--- abbreviations (e.g., 'LAL', 'NYK')
+    prop_type, 
+    line_value, 
+    odds_over, 
+    game_time, 
+    merchant_name, 
+    last_updated
+))
                             count += 1
             
             except Exception as e_game:
                 print(f"Error processing game {game_id}: {e_game}")
                 continue
+
+        # 1. Commit all the new props you just inserted
+        conn.commit()
+
+        # 2. RUN THE CLEANUP ONCE HERE
+        print("Deduplicating active lines...")
+        cursor.execute("""
+            DELETE FROM active_lines 
+            WHERE id NOT IN (
+                SELECT MAX(id) 
+                FROM active_lines 
+                GROUP BY player_name, prop_type, merchant_name
+            )
+        """)
 
         conn.commit()
         conn.close()

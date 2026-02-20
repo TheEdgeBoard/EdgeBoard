@@ -228,35 +228,37 @@
     }
 
     function renderTable() {
-    const body = document.getElementById('table-body');
-    body.innerHTML = '';
-    
-    const filtered = rawData.filter(d => {
-        if(localStorage.getItem(`hide_${d.player_name}`)) return false;
+        const body = document.getElementById('table-body');
+        body.innerHTML = '';
         
-        // --- FIX: If trend_history is missing, show the player anyway 
-        // but mark them as TBD in the UI
-        if(!d.trend_history || d.trend_history === "") return true; 
+        // --- 1. Filter the data ---
+        const filtered = rawData.filter(d => {
+            // Respect the 'Hide' button
+            if(localStorage.getItem(`hide_${d.player_name}`)) return false;
+            
+            // If the simulation probability is missing, we can't show it
+            if(!d[`win_rate_${trendWin}`]) return false;
 
-        const historyArray = d.trend_history.split(',').map(Number);
-        const recentHistory = historyArray.slice(0, trendWin);
-        const hits = recentHistory.reduce((a, b) => a + b, 0);
-        
-        // If you want to see ALL sims regardless of historical hit rate, 
-        // comment out the next 4 lines.
-        if(trendWin === 3 && hits < 1) return false; // Show if hit at least 1/3
-        if(trendWin === 5 && hits < 2) return false; // Show if hit at least 2/5
-        return true;
-    });
+            // Optional: Re-enable strict filtering only if trend_history exists
+            if (d.trend_history) {
+                const historyArray = d.trend_history.split(',').map(Number);
+                const hits = historyArray.slice(0, trendWin).reduce((a, b) => a + b, 0);
+                
+                // Relaxed filters: only hide if they haven't hit at least ONCE in the window
+                if(hits < 1) return false; 
+            }
 
-    if(filtered.length === 0) {
-         body.innerHTML = `<tr><td colspan="6" class="p-20 text-center text-gray-500 orbitron">NO BETS FOUND FOR WINDOW L${trendWin}</td></tr>`;
-         return;
-    }
-    // ... (rest of your mapping logic remains the same)
+            return true;
+        });
 
+        // --- 2. Check if anything is left ---
+        if(filtered.length === 0) {
+             body.innerHTML = `<tr><td colspan="6" class="p-20 text-center text-gray-500 orbitron uppercase tracking-widest">No active bets match L${trendWin} filter</td></tr>`;
+             return;
+        }
+
+        // --- 3. Map the rows to HTML ---
         const rows = filtered.map(d => {
-            // 1. Calculate Historical Hit Rate (for filtering or secondary display)
             let histHitRate = "TBD";
             if (d.trend_history) {
                 const arr = d.trend_history.split(',').map(Number).slice(0, trendWin);
@@ -264,22 +266,17 @@
                 histHitRate = ((hits / arr.length) * 100).toFixed(0) + "%";
             }
 
-            // 2. DYNAMICALLY grab the Monte Carlo data based on the active L3/L5/L10/L14 button
             let simProb = d[`win_rate_${trendWin}`] ? d[`win_rate_${trendWin}`].toFixed(1) + '%' : 'TBD';
-            
-            // 3. Grab the EV Edge and color-code it (Green for positive, Red for negative)
             let rawEv = d[`ev_${trendWin}`];
             let evEdgeStr = rawEv ? (rawEv > 0 ? '+' : '') + rawEv.toFixed(1) + '%' : '-';
             let evColor = rawEv > 0 ? 'text-emerald-400' : 'text-red-500';
-
-            // 4. Format the sportsbook odds
             const americanOdds = formatAmericanOdds(d.odds_over);
 
             return `
             <tr class="border-b border-gray-800 hover:bg-emerald-500/5 transition-colors">
                 <td class="p-5 font-bold text-white">
                     ${d.player_name} 
-                    <div class="text-[10px] text-gray-500 font-normal">${d.team || 'NBA'} | Hit Rate: ${histHitRate}</div>
+                    <div class="text-[10px] text-gray-500 font-normal">${d.team || 'NBA'} | L${trendWin} Hit: ${histHitRate}</div>
                 </td>
                 <td class="p-5">
                     <div class="text-[10px] text-gray-500 uppercase">${d.prop_type}</div>
