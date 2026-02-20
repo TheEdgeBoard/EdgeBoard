@@ -228,26 +228,32 @@
     }
 
     function renderTable() {
-        const body = document.getElementById('table-body');
-        body.innerHTML = '';
+    const body = document.getElementById('table-body');
+    body.innerHTML = '';
+    
+    const filtered = rawData.filter(d => {
+        if(localStorage.getItem(`hide_${d.player_name}`)) return false;
         
-        const filtered = rawData.filter(d => {
-            if(localStorage.getItem(`hide_${d.player_name}`)) return false;
-            
-            if(!d.trend_history) return true; 
-            const hits = d.trend_history.split(',').map(Number).slice(0, trendWin).reduce((a,b)=>a+b, 0);
-            
-            if(trendWin === 3 && hits < 2) return false;
-            if(trendWin === 5 && hits < 4) return false;
-            if(trendWin === 10 && hits < 8) return false;
-            if(trendWin === 14 && hits < 11) return false;
-            return true;
-        });
+        // --- FIX: If trend_history is missing, show the player anyway 
+        // but mark them as TBD in the UI
+        if(!d.trend_history || d.trend_history === "") return true; 
 
-        if(filtered.length === 0) {
-             body.innerHTML = `<tr><td colspan="6" class="p-20 text-center text-gray-500 orbitron">NO BETS FIT TREND FILTER (L${trendWin})</td></tr>`;
-             return;
-        }
+        const historyArray = d.trend_history.split(',').map(Number);
+        const recentHistory = historyArray.slice(0, trendWin);
+        const hits = recentHistory.reduce((a, b) => a + b, 0);
+        
+        // If you want to see ALL sims regardless of historical hit rate, 
+        // comment out the next 4 lines.
+        if(trendWin === 3 && hits < 1) return false; // Show if hit at least 1/3
+        if(trendWin === 5 && hits < 2) return false; // Show if hit at least 2/5
+        return true;
+    });
+
+    if(filtered.length === 0) {
+         body.innerHTML = `<tr><td colspan="6" class="p-20 text-center text-gray-500 orbitron">NO BETS FOUND FOR WINDOW L${trendWin}</td></tr>`;
+         return;
+    }
+    // ... (rest of your mapping logic remains the same)
 
         const rows = filtered.map(d => {
             // 1. Calculate Historical Hit Rate (for filtering or secondary display)
