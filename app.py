@@ -106,17 +106,16 @@ def get_data():
 
     conn = get_db_connection()
     try:
-        # We ensure we pull all windows so the JavaScript toggles work
         query = '''
             SELECT 
                 a.*, 
                 s.suggestion,
-                COALESCE(s.win_rate_3, 0) as win_rate_3, COALESCE(s.ev_3, 0) as ev_3,
-                COALESCE(s.win_rate_5, 0) as win_rate_5, COALESCE(s.ev_5, 0) as ev_5,
-                COALESCE(s.win_rate_10, 0) as win_rate_10, COALESCE(s.ev_10, 0) as ev_10,
-                COALESCE(s.win_rate_14, 0) as win_rate_14, COALESCE(s.ev_14, 0) as ev_14
+                s.win_rate_3, s.ev_3,
+                s.win_rate_5, s.ev_5,
+                s.win_rate_10, s.ev_10,
+                s.win_rate_14, s.ev_14
             FROM active_lines a
-            INNER JOIN sim_results s 
+            LEFT JOIN sim_results s 
                 ON a.player_name = s.player_name 
                 AND a.prop_type = s.prop_type
             WHERE a.line_value IS NOT NULL
