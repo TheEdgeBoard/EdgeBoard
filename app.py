@@ -105,17 +105,29 @@ def get_data():
     if sport != 'NBA': return jsonify([]) 
 
     conn = get_db_connection()
-    # Simplified Query to prevent crashes if columns are missing
-    query = '''
-        SELECT * FROM active_lines
-    '''
     try:
+        # --- THE MAGIC JOIN ---
+        # Grabs the live lines and matches them to the Monte Carlo math
+        query = '''
+            SELECT 
+                a.*, 
+                s.suggestion,
+                s.win_rate_3, s.ev_3,
+                s.win_rate_5, s.ev_5,
+                s.win_rate_10, s.ev_10,
+                s.win_rate_14, s.ev_14
+            FROM active_lines a
+            LEFT JOIN sim_results s 
+                ON a.player_name = s.player_name 
+                AND a.prop_type = s.prop_type
+            WHERE a.line_value IS NOT NULL
+        '''
         results = conn.execute(query).fetchall()
-        # Convert to list of dicts
         data = [dict(row) for row in results]
     except Exception as e:
         print(f"DB Error: {e}")
         data = []
+        
     conn.close()
     return jsonify(data)
 

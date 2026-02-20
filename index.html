@@ -256,29 +256,37 @@
         }
 
         const rows = filtered.map(d => {
-            let winRateStr = "TBD";
+            // 1. Calculate Historical Hit Rate (for filtering or secondary display)
+            let histHitRate = "TBD";
             if (d.trend_history) {
                 const arr = d.trend_history.split(',').map(Number).slice(0, trendWin);
                 const hits = arr.reduce((a,b) => a + b, 0);
-                const pct = (hits / arr.length) * 100;
-                winRateStr = pct.toFixed(0) + "%";
+                histHitRate = ((hits / arr.length) * 100).toFixed(0) + "%";
             }
 
-            // --- Apply the conversion here ---
+            // 2. DYNAMICALLY grab the Monte Carlo data based on the active L3/L5/L10/L14 button
+            let simProb = d[`win_rate_${trendWin}`] ? d[`win_rate_${trendWin}`].toFixed(1) + '%' : 'TBD';
+            
+            // 3. Grab the EV Edge and color-code it (Green for positive, Red for negative)
+            let rawEv = d[`ev_${trendWin}`];
+            let evEdgeStr = rawEv ? (rawEv > 0 ? '+' : '') + rawEv.toFixed(1) + '%' : '-';
+            let evColor = rawEv > 0 ? 'text-emerald-400' : 'text-red-500';
+
+            // 4. Format the sportsbook odds
             const americanOdds = formatAmericanOdds(d.odds_over);
 
             return `
             <tr class="border-b border-gray-800 hover:bg-emerald-500/5 transition-colors">
                 <td class="p-5 font-bold text-white">
                     ${d.player_name} 
-                    <div class="text-[10px] text-gray-500 font-normal">${d.team || 'NBA'}</div>
+                    <div class="text-[10px] text-gray-500 font-normal">${d.team || 'NBA'} | Hit Rate: ${histHitRate}</div>
                 </td>
                 <td class="p-5">
                     <div class="text-[10px] text-gray-500 uppercase">${d.prop_type}</div>
                     <div class="text-emerald-400 font-bold">OVER ${d.line_value}</div>
                 </td>
-                <td class="p-5 text-center text-blue-400 font-black">${winRateStr}</td>
-                <td class="p-5 text-center text-emerald-400 font-black">-</td>
+                <td class="p-5 text-center text-blue-400 font-black">${simProb}</td>
+                <td class="p-5 text-center ${evColor} font-black">${evEdgeStr}</td>
                 <td class="p-5 text-center">
                     <div class="text-white font-bold text-xs">${americanOdds}</div>
                     <div class="text-[9px] text-gray-500 uppercase">${d.merchant_name || 'Market'}</div>
