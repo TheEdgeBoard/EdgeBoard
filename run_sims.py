@@ -51,22 +51,32 @@ def run_weighted_sims_with_sos():
                 outcomes = (subset['pts'] + subset['reb'] + subset['ast']).values
             else: continue
 
-            # SOS Logic
+            # --- UPDATED: CONSERVATIVE SUBTRACTIVE LOGIC ---
             try:
-                sos_past = metrics_df.loc[metrics_df['team_abbrev'] == team, 'defensive_rating'].values[0] / avg_def
                 opp_stats = metrics_df[metrics_df['team_abbrev'] == opp]
-                matchup_factor = (opp_stats['pace'].values[0] / avg_pace) * (opp_stats['defensive_rating'].values[0] / avg_def)
-                multiplier = matchup_factor / sos_past
+                opp_def_rating = opp_stats['defensive_rating'].values[0]
+                
+                if opp_def_rating < avg_def:
+                    # Defense is better than average: Apply a tax (max 15%)
+                    tax = min((avg_def - opp_def_rating) / avg_def, 0.15)
+                    penalty = 1.0 - tax
+                else:
+                    # Defense is worse than average: Stay conservative (max 1% bump)
+                    pace_factor = opp_stats['pace'].values[0] / avg_pace
+                    penalty = min(1.01, pace_factor)
             except:
-                multiplier = 1.0
+                penalty = 1.0
 
-            # 10k Simulations
-            sim_results = np.random.choice(outcomes, size=10000, replace=True) * multiplier * np.random.normal(1.0, 0.05, 10000)
+            # 10k Simulations with tighter variance (0.03)
+            sim_results = np.random.choice(outcomes, size=10000, replace=True) * penalty * np.random.normal(1.0, 0.03, 10000)
+            
+            # --- THE 99.9% CAP ---
             prob_over = np.sum(sim_results > line) / 10000
+            prob_percent = min(round(prob_over * 100, 1), 99.9)
             
             # Save specific window data
-            player_result[f'win_rate_{w}'] = round(prob_over * 100, 1)
-            player_result[f'ev_{w}'] = round((prob_over - 0.54) * 100, 1) # Simple EV calc
+            player_result[f'win_rate_{w}'] = prob_percent
+            player_result[f'ev_{w}'] = round((prob_over - 0.54) * 100, 1)
             player_result[f'proj_{w}'] = round(sim_results.mean(), 2)
 
         results.append(player_result)
