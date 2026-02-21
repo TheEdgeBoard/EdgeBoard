@@ -107,6 +107,7 @@ def get_data():
 
     conn = get_db_connection()
     try:
+        # --- UPDATED QUERY: Added a filter for positive 10-game EV ---
         query = '''
             SELECT 
                 a.*, 
@@ -120,6 +121,7 @@ def get_data():
                 ON a.player_name = s.player_name 
                 AND a.prop_type = s.prop_type
             WHERE a.line_value IS NOT NULL
+              AND s.ev_10 > 0  -- Only show bets with positive Expected Value
         '''
         results = conn.execute(query).fetchall()
         data = [dict(row) for row in results]
