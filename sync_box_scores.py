@@ -35,26 +35,67 @@ def sync_box_scores():
     except Exception as e:
         print(f"❌ Error reading active_lines: {e}")
         return
+        
+    # --- ADD THESE TWO LINES HERE ---
+    total_players = len(active_players)
+    counter = 0
+    print(f"📋 Identified {total_players} players to sync for today's slate.")
 
     headers = {'Authorization': BDL_API_KEY}
 
     for player_name in active_players:
+        # --- ADD THIS LINE HERE ---
+        counter += 1
+        
+        search_name = NAME_MAP.get(player_name, player_name)
         # Check mapping
         search_name = NAME_MAP.get(player_name, player_name)
         
-        # --- FIX: New Balldontlie ID Lookup (Replaces old 'players' line) ---
+        # Split name for a more reliable search
+        parts = search_name.split()
+        first_name = parts[0]
+        last_name = parts[-1]
+
         print(f"🔍 Searching ID for: {search_name}")
         try:
-            player_res = requests.get(f"https://api.balldontlie.io/v1/players?search={search_name}", headers=headers)
-            time.sleep(1.1) # All-Star Tier throttle
+            # Search by LAST NAME only to be safe
+            url = f"https://api.balldontlie.io/v1/players?first_name={first_name}&last_name={last_name}"
+            player_res = requests.get(url, headers=headers)
+            time.sleep(1.1) 
             
             if player_res.status_code == 200:
                 p_data = player_res.json().get('data', [])
+                
+                # If that specific first/last combo fails, try just last_name
+                if not p_data:
+                    url = f"https://api.balldontlie.io/v1/players?search={last_name}"
+                    player_res = requests.get(url, headers=headers)
+                    time.sleep(1.1)
+                    p_data = player_res.json().get('data', [])
+
                 if not p_data:
                     print(f"⚠️ {search_name} not found.")
                     continue
                 
+                # Match the first player in the list
                 player_id = p_data[0]['id']
+                # --- NEW: Fix the Team/Opponent Mapping Bug ---
+                true_team = p_data[0]['team']['abbreviation']
+                cursor.execute("SELECT team, opponent FROM active_lines WHERE player_name = ?", (player_name,))
+                row = cursor.fetchone()
+                
+                if row:
+                    api_team, api_opp = row['team'], row['opponent']
+                    # If the true team from Balldontlie matches the opponent column, flip them!
+                    if true_team == api_opp:
+                        cursor.execute('''
+                            UPDATE active_lines 
+                            SET team = ?, opponent = ? 
+                            WHERE player_name = ?
+                        ''', (true_team, api_team, player_name))
+                        print(f"   🔄 Flipped mismatch: {player_name} plays for {true_team}, not {api_team}")
+                # ----------------------------------------------
+                # ... (rest of your stats_res code remains the same)
                 
                 # Now fetch the last 14 games
                 stats_res = requests.get(f"https://api.balldontlie.io/v1/stats?player_ids[]={player_id}&per_page=14", headers=headers)
