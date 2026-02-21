@@ -3,6 +3,7 @@ import sqlite3
 import os
 import sys
 import subprocess
+from werkzeug.security import check_password_hash
 
 # --- CONFIGURATION ---
 BASE_DIR = '/home/TheEdgeBoard/EdgeBoard/'
@@ -63,14 +64,14 @@ def login():
         user = conn.execute('SELECT * FROM users WHERE username = ?', (data['username'],)).fetchone()
         conn.close()
         
-        # Simple password check
-        if user and user['password'] == data['password']:
-            # --- NEW: Save user info to Session ---
+        # --- FIXED: Use check_password_hash and the correct column names ---
+        if user and check_password_hash(user['password_hash'], data['password']):
             session['username'] = user['username']
-            session['role'] = user['role']
+            session['role'] = user['access_level'] # Changed from 'role' to match your DB
             session['logged_in'] = True
-            # --------------------------------------
-            return jsonify({"status": "success", "role": user['role'], "username": user['username']})
+            
+            return jsonify({"status": "success", "role": user['access_level'], "username": user['username']})
+        # -------------------------------------------------------------------
         
         return jsonify({"status": "error", "message": "Invalid Credentials"}), 401
     except Exception as e:
