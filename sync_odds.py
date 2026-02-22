@@ -195,14 +195,16 @@ def sync_odds():
         # 1. Commit all the new props you just inserted
         conn.commit()
 
-        # 2. RUN THE CLEANUP ONCE HERE
-        print("Deduplicating active lines...")
+        # 2. TOTAL DEDUPLICATION: 
+        # This keeps exactly ONE entry per Player/Prop/Line combo, 
+        # regardless of bookmaker or timing.
+        print("Finalizing Board: Removing all identical duplicates...")
         cursor.execute("""
             DELETE FROM active_lines 
             WHERE id NOT IN (
-                SELECT MAX(id) 
+                SELECT MIN(id) 
                 FROM active_lines 
-                GROUP BY player_name, prop_type, merchant_name
+                GROUP BY player_name, prop_type, line_value
             )
         """)
 

@@ -1,46 +1,47 @@
 import subprocess
-import time
-import os
 import sys
+import time
 
-# List your scripts in the exact order they need to run
-SCRIPTS = [
-    "sync_odds.py",
-    "sync_box_scores.py",
-    "sync_stats.py",
-    "run_sims.py"
-]
+def run_script(script_name):
+    """Runs a python script and waits for it to finish."""
+    print(f"\n🚀 [STARTING] {script_name}...")
+    try:
+        # We use sys.executable to ensure it uses the same python environment
+        result = subprocess.run([sys.executable, script_name], check=True)
+        if result.returncode == 0:
+            print(f"✅ [FINISHED] {script_name} successfully.")
+    except subprocess.CalledProcessError as e:
+        print(f"❌ [ERROR] {script_name} failed with error: {e}")
+        sys.exit(1) # Stop the whole chain if one script fails
 
-def run_master():
-    print("="*40)
-    print("🚀 EDGEBOARD MASTER SYNC INITIATED")
-    print("="*40)
-    
+def main():
     start_time = time.time()
+    
+    # THE CRITICAL ORDER OF OPERATIONS
+    sync_chain = [
+        "clean_db.py",          # 1. Wipe old stats locally
+        "sync_odds.py",         # 2. Pull fresh lines
+        "sync_box_scores.py",   # 3. Pull 2026 logs
+        "sync_stats.py",        # 4. Calculate hit trends
+        "run_sims.py",          # 5. Run the Monte Carlo engine
+        "push_stats_to_live.py" # 6. ADD THIS HERE: Export and push CSVs
+    ]
 
-    for i, script in enumerate(SCRIPTS):
-        print(f"\n[{i+1}/{len(SCRIPTS)}] RUNNING: {script}...")
-        
-        try:
-            # subprocess.run waits for the script to finish before moving to the next
-            result = subprocess.run([sys.executable, script], check=True)
-            
-            if result.returncode == 0:
-                print(f"✅ {script} completed successfully.")
-            
-        except subprocess.CalledProcessError as e:
-            print(f"\n❌ FATAL ERROR in {script}")
-            print("Master sync aborted to prevent data corruption.")
-            return
+    print("--- 🏀 EDGEBOARD MASTER DAILY SYNC 🏀 ---")
+    
+    # ... rest of your code ...
+    
+    for script in sync_chain:
+        run_script(script)
 
     end_time = time.time()
     duration = round((end_time - start_time) / 60, 2)
     
     print("\n" + "="*40)
-    print(f"🎉 SUCCESS: All data is ready for upload!")
-    print(f"⏱️ Total Time: {duration} minutes")
+    print(f"🏁 ALL SYSTEMS GREEN")
+    print(f"⏱️ Total Sync Time: {duration} minutes")
+    print(f"💾 Local 'edgeboard.db' is now optimized and ready for Git.")
     print("="*40)
-    print("\nNEXT STEP: Run your Git commands to push edgeboard.db live.")
 
 if __name__ == "__main__":
-    run_master()
+    main()

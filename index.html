@@ -231,34 +231,18 @@
         const body = document.getElementById('table-body');
         body.innerHTML = '';
         
-        // --- 1. Filter the data ---
         const filtered = rawData.filter(d => {
-            // Respect the 'Hide' button
             if(localStorage.getItem(`hide_${d.player_name}`)) return false;
-            
-            // If the simulation probability is missing, we can't show it
             if(!d[`win_rate_${trendWin}`]) return false;
-
-            // Optional: Re-enable strict filtering only if trend_history exists
-            if (d.trend_history) {
-                const historyArray = d.trend_history.split(',').map(Number);
-                const hits = historyArray.slice(0, trendWin).reduce((a, b) => a + b, 0);
-                
-                // Relaxed filters: only hide if they haven't hit at least ONCE in the window
-                if(hits < 1) return false; 
-            }
-
             return true;
         });
 
-        // --- 2. Check if anything is left ---
         if(filtered.length === 0) {
-             body.innerHTML = `<tr><td colspan="6" class="p-20 text-center text-gray-500 orbitron uppercase tracking-widest">No active bets match L${trendWin} filter</td></tr>`;
+             body.innerHTML = `<tr><td colspan="6" class="p-20 text-center text-gray-500 orbitron">No active bets match filter</td></tr>`;
              return;
         }
 
-        // --- 3. Map the rows to HTML ---
-        const rows = filtered.map(d => {
+        const rows = filtered.map((d, index) => {
             let histHitRate = "TBD";
             if (d.trend_history) {
                 const arr = d.trend_history.split(',').map(Number).slice(0, trendWin);
@@ -267,10 +251,27 @@
             }
 
             let simProb = d[`win_rate_${trendWin}`] ? d[`win_rate_${trendWin}`].toFixed(1) + '%' : 'TBD';
-            let rawEv = d[`ev_${trendWin}`];
-            let evEdgeStr = rawEv ? (rawEv > 0 ? '+' : '') + rawEv.toFixed(1) + '%' : '-';
-            let evColor = rawEv > 0 ? 'text-emerald-400' : 'text-red-500';
-            const americanOdds = formatAmericanOdds(d.odds_over);
+            let evColor = d[`ev_${trendWin}`] > 0 ? 'text-emerald-400' : 'text-red-500';
+            
+            // Generate HTML for Alternative Lines
+            const altLinesHtml = d.alt_lines && d.alt_lines.length > 1 
+                ? `<div id="alt-${index}" class="hidden bg-gray-950 p-3 mt-2 rounded border border-gray-800">
+                    <div class="text-[9px] text-gray-500 mb-2 uppercase">Other Available Lines</div>
+                    ${d.alt_lines.map(alt => `
+                        <div class="flex justify-between text-[11px] py-1 border-b border-gray-900 last:border-0">
+                            <span class="text-white">OVER ${alt.line}</span>
+                            <span class="text-emerald-500 font-bold">${formatAmericanOdds(alt.odds)}</span>
+                            <span class="text-gray-600 text-[9px]">${alt.book}</span>
+                        </div>
+                    `).join('')}
+                   </div>`
+                : '';
+
+            const dropdownBtn = d.alt_lines && d.alt_lines.length > 1
+                ? `<button onclick="toggleAlt(${index})" class="text-[9px] text-emerald-500 mt-1 hover:underline block">
+                    + VIEW ${d.alt_lines.length - 1} OTHER LINES
+                   </button>`
+                : '';
 
             return `
             <tr class="border-b border-gray-800 hover:bg-emerald-500/5 transition-colors">
@@ -281,21 +282,29 @@
                 <td class="p-5">
                     <div class="text-[10px] text-gray-500 uppercase">${d.prop_type}</div>
                     <div class="text-emerald-400 font-bold">OVER ${d.line_value}</div>
+                    ${dropdownBtn}
+                    ${altLinesHtml}
                 </td>
                 <td class="p-5 text-center text-blue-400 font-black">${simProb}</td>
-                <td class="p-5 text-center ${evColor} font-black">${evEdgeStr}</td>
+                <td class="p-5 text-center ${evColor} font-black">${(d[`ev_${trendWin}`] || 0).toFixed(1)}%</td>
                 <td class="p-5 text-center">
-                    <div class="text-white font-bold text-xs">${americanOdds}</div>
-                    <div class="text-[9px] text-gray-500 uppercase">${d.merchant_name || 'Market'}</div>
+                    <div class="text-white font-bold text-xs">${formatAmericanOdds(d.odds_over)}</div>
+                    <div class="text-[9px] text-gray-500 uppercase">${d.merchant_name}</div>
                 </td>
                 <td class="p-5 text-right">
-                    <button onclick="hideBet('${d.player_name}')" class="text-[10px] text-gray-600 hover:text-red-500 font-bold transition-colors">HIDE</button>
+                    <button onclick="hideBet('${d.player_name}')" class="text-[10px] text-gray-600 hover:text-red-500 font-bold">HIDE</button>
                 </td>
             </tr>
             `;
         }).join('');
         
         body.innerHTML = rows;
+    }
+
+    // New helper function to toggle the dropdown
+    function toggleAlt(index) {
+        const el = document.getElementById(`alt-${index}`);
+        el.classList.toggle('hidden');
     } 
 
     function setTrend(n) {

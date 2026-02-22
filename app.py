@@ -107,24 +107,48 @@ def get_data():
 
     conn = get_db_connection()
     try:
-        # --- UPDATED QUERY: Added a filter for positive 10-game EV ---
+        # This query groups by player and prop, picking the highest line as the primary.
+        # It also bundles all available lines for that specific prop into a JSON string.
         query = '''
             SELECT 
-                a.*, 
+                a.player_name,
+                a.prop_type,
+                a.team,
+                MAX(a.line_value) as line_value,  -- Default to the higher line
+                a.odds_over,
+                a.merchant_name,
                 s.suggestion,
-                s.win_rate_3, s.ev_3,
-                s.win_rate_5, s.ev_5,
                 s.win_rate_10, s.ev_10,
-                s.win_rate_14, s.ev_14
+                s.win_rate_14, s.ev_14,
+                a.trend_history,
+                -- Create a JSON list of all available lines for this specific prop
+                '[' || GROUP_CONCAT(
+                    '{"line":' || a.line_value || 
+                    ',"odds":' || a.odds_over || 
+                    ',"book":"' || a.merchant_name || '"}'
+                ) || ']' AS alt_lines
             FROM active_lines a
             LEFT JOIN sim_results s 
                 ON a.player_name = s.player_name 
                 AND a.prop_type = s.prop_type
             WHERE a.line_value IS NOT NULL
-              AND s.ev_10 > 0  -- Only show bets with positive Expected Value
+              AND s.ev_10 > 0
+            GROUP BY a.player_name, a.prop_type
+            ORDER BY s.ev_10 DESC
         '''
         results = conn.execute(query).fetchall()
-        data = [dict(row) for row in results]
+        
+        # Convert rows to dicts and parse the alt_lines string into a real list
+        data = []
+        for row in results:
+            d = dict(row)
+            import json
+            try:
+                d['alt_lines'] = json.loads(d['alt_lines'])
+            except:
+                d['alt_lines'] = []
+            data.append(d)
+            
     except Exception as e:
         print(f"DB Error: {e}")
         data = []
