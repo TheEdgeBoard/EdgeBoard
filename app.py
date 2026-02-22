@@ -107,48 +107,44 @@ def get_data():
 
     conn = get_db_connection()
     try:
-        # This query groups by player and prop, picking the highest line as the primary.
-        # It also bundles all available lines for that specific prop into a JSON string.
+        # We group by player AND prop to collapse duplicates.
+        # We use a custom separator '|||' to avoid breaking the JSON.
         query = '''
             SELECT 
-                a.player_name,
-                a.prop_type,
-                a.team,
-                MAX(a.line_value) as line_value,  -- Default to the higher line
-                a.odds_over,
-                a.merchant_name,
-                s.suggestion,
-                s.win_rate_10, s.ev_10,
-                s.win_rate_14, s.ev_14,
+                a.player_name, a.prop_type, a.team, a.odds_over, a.merchant_name,
+                MAX(a.line_value) as line_value,
+                s.suggestion, s.win_rate_10, s.ev_10, s.win_rate_14, s.ev_14,
                 a.trend_history,
-                -- Create a JSON list of all available lines for this specific prop
-                '[' || GROUP_CONCAT(
-                    '{"line":' || a.line_value || 
-                    ',"odds":' || a.odds_over || 
-                    ',"book":"' || a.merchant_name || '"}'
-                ) || ']' AS alt_lines
+                GROUP_CONCAT(a.line_value || ':' || a.odds_over || ':' || a.merchant_name, '|') as alt_data
             FROM active_lines a
-            LEFT JOIN sim_results s 
-                ON a.player_name = s.player_name 
-                AND a.prop_type = s.prop_type
-            WHERE a.line_value IS NOT NULL
-              AND s.ev_10 > 0
+            LEFT JOIN sim_results s ON a.player_name = s.player_name AND a.prop_type = s.prop_type
+            WHERE a.line_value IS NOT NULL AND s.ev_10 > 0
             GROUP BY a.player_name, a.prop_type
             ORDER BY s.ev_10 DESC
         '''
         results = conn.execute(query).fetchall()
         
-        # Convert rows to dicts and parse the alt_lines string into a real list
         data = []
         for row in results:
             d = dict(row)
-            import json
-            try:
-                d['alt_lines'] = json.loads(d['alt_lines'])
-            except:
-                d['alt_lines'] = []
+            # Split the alt_data string into a clean list of objects
+            d['alt_lines'] = []
+            if d['alt_data']:
+                parts = d['alt_data'].split('|')
+                for p in parts:
+                    try:
+                        # Use rsplit to handle any unexpected colons in merchant names
+                        # It splits from the right, picking off the merchant name last
+                        val, odds, book = p.rsplit(':', 2)
+                        d['alt_lines'].append({
+                            "line": float(val), 
+                            "odds": float(odds), 
+                            "book": book
+                        })
+                    except ValueError:
+                        # This skips the line if the data is corrupted instead of crashing the site
+                        continue
             data.append(d)
-            
     except Exception as e:
         print(f"DB Error: {e}")
         data = []

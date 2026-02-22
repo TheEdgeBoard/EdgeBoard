@@ -227,22 +227,31 @@
         }
     }
 
+    function toggleAlt(id) {
+        const el = document.getElementById(id);
+        if (el) {
+            el.classList.toggle('hidden');
+        }
+    }
+
     function renderTable() {
         const body = document.getElementById('table-body');
         body.innerHTML = '';
         
         const filtered = rawData.filter(d => {
             if(localStorage.getItem(`hide_${d.player_name}`)) return false;
-            if(!d[`win_rate_${trendWin}`]) return false;
-            return true;
+            return d[`win_rate_${trendWin}`] != null;
         });
 
         if(filtered.length === 0) {
-             body.innerHTML = `<tr><td colspan="6" class="p-20 text-center text-gray-500 orbitron">No active bets match filter</td></tr>`;
+             body.innerHTML = `<tr><td colspan="6" class="p-20 text-center text-gray-500 orbitron uppercase tracking-widest">No active bets match L${trendWin} filter</td></tr>`;
              return;
         }
 
-        const rows = filtered.map((d, index) => {
+        body.innerHTML = filtered.map((d, i) => {
+            const rowId = `alt-row-${i}`;
+            const hasAlts = d.alt_lines && d.alt_lines.length > 1;
+
             let histHitRate = "TBD";
             if (d.trend_history) {
                 const arr = d.trend_history.split(',').map(Number).slice(0, trendWin);
@@ -250,61 +259,43 @@
                 histHitRate = ((hits / arr.length) * 100).toFixed(0) + "%";
             }
 
-            let simProb = d[`win_rate_${trendWin}`] ? d[`win_rate_${trendWin}`].toFixed(1) + '%' : 'TBD';
-            let evColor = d[`ev_${trendWin}`] > 0 ? 'text-emerald-400' : 'text-red-500';
-            
-            // Generate HTML for Alternative Lines
-            const altLinesHtml = d.alt_lines && d.alt_lines.length > 1 
-                ? `<div id="alt-${index}" class="hidden bg-gray-950 p-3 mt-2 rounded border border-gray-800">
-                    <div class="text-[9px] text-gray-500 mb-2 uppercase">Other Available Lines</div>
+            const altHtml = hasAlts ? `
+                <div id="${rowId}" class="hidden bg-slate-950 p-3 mt-2 rounded border border-slate-800 shadow-inner">
+                    <p class="text-[9px] text-gray-500 uppercase mb-2 font-bold tracking-tighter">Market Comparison</p>
                     ${d.alt_lines.map(alt => `
                         <div class="flex justify-between text-[11px] py-1 border-b border-gray-900 last:border-0">
-                            <span class="text-white">OVER ${alt.line}</span>
-                            <span class="text-emerald-500 font-bold">${formatAmericanOdds(alt.odds)}</span>
-                            <span class="text-gray-600 text-[9px]">${alt.book}</span>
+                            <span class="text-emerald-400">OVER ${alt.line}</span>
+                            <span class="text-white font-bold">${formatAmericanOdds(alt.odds)}</span>
+                            <span class="text-gray-600 text-[10px]">${alt.book}</span>
                         </div>
                     `).join('')}
-                   </div>`
-                : '';
-
-            const dropdownBtn = d.alt_lines && d.alt_lines.length > 1
-                ? `<button onclick="toggleAlt(${index})" class="text-[9px] text-emerald-500 mt-1 hover:underline block">
-                    + VIEW ${d.alt_lines.length - 1} OTHER LINES
-                   </button>`
-                : '';
+                </div>` : '';
 
             return `
             <tr class="border-b border-gray-800 hover:bg-emerald-500/5 transition-colors">
-                <td class="p-5 font-bold text-white">
-                    ${d.player_name} 
+                <td class="p-5">
+                    <div class="font-bold text-white text-base">${d.player_name}</div>
                     <div class="text-[10px] text-gray-500 font-normal">${d.team || 'NBA'} | L${trendWin} Hit: ${histHitRate}</div>
                 </td>
                 <td class="p-5">
-                    <div class="text-[10px] text-gray-500 uppercase">${d.prop_type}</div>
-                    <div class="text-emerald-400 font-bold">OVER ${d.line_value}</div>
-                    ${dropdownBtn}
-                    ${altLinesHtml}
+                    <div class="text-[10px] text-gray-500 uppercase font-semibold">${d.prop_type}</div>
+                    <div class="text-emerald-400 font-black text-sm">OVER ${d.line_value}</div>
+                    ${hasAlts ? `<button onclick="toggleAlt('${rowId}')" class="text-[9px] text-blue-400 hover:text-blue-300 font-bold mt-1 flex items-center gap-1">
+                        <span class="text-xs">⊕</span> VIEW ${d.alt_lines.length} OTHER LINES
+                    </button>` : ''}
+                    ${altHtml}
                 </td>
-                <td class="p-5 text-center text-blue-400 font-black">${simProb}</td>
-                <td class="p-5 text-center ${evColor} font-black">${(d[`ev_${trendWin}`] || 0).toFixed(1)}%</td>
+                <td class="p-5 text-center text-blue-400 font-black text-lg">${d[`win_rate_${trendWin}`].toFixed(1)}%</td>
+                <td class="p-5 text-center text-emerald-400 font-black text-lg">+${(d[`ev_${trendWin}`] || 0).toFixed(1)}%</td>
                 <td class="p-5 text-center">
                     <div class="text-white font-bold text-xs">${formatAmericanOdds(d.odds_over)}</div>
-                    <div class="text-[9px] text-gray-500 uppercase">${d.merchant_name}</div>
+                    <div class="text-[9px] text-gray-500 uppercase tracking-tighter">${d.merchant_name}</div>
                 </td>
                 <td class="p-5 text-right">
-                    <button onclick="hideBet('${d.player_name}')" class="text-[10px] text-gray-600 hover:text-red-500 font-bold">HIDE</button>
+                    <button onclick="hideBet('${d.player_name}')" class="text-[10px] text-gray-600 hover:text-red-500 font-bold uppercase">Hide</button>
                 </td>
-            </tr>
-            `;
+            </tr>`;
         }).join('');
-        
-        body.innerHTML = rows;
-    }
-
-    // New helper function to toggle the dropdown
-    function toggleAlt(index) {
-        const el = document.getElementById(`alt-${index}`);
-        el.classList.toggle('hidden');
     } 
 
     function setTrend(n) {
