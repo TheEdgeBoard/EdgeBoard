@@ -107,16 +107,17 @@ def get_data():
 
     conn = get_db_connection()
     try:
-        # We group by player AND prop to collapse duplicates.
-        # We use a custom separator '|||' to avoid breaking the JSON.
+        # We first sort the entire active_lines table by odds descending.
+        # This ensures that when we GROUP BY later, the "primary" row picked
+        # is the one that pays the user the most.
         query = '''
             SELECT 
                 a.player_name, a.prop_type, a.team, a.odds_over, a.merchant_name,
-                MAX(a.line_value) as line_value,
+                a.line_value as primary_line,
                 s.suggestion, s.win_rate_10, s.ev_10, s.win_rate_14, s.ev_14,
                 a.trend_history,
-                GROUP_CONCAT(a.line_value || ':' || a.odds_over || ':' || a.merchant_name, '|') as alt_data
-            FROM active_lines a
+                GROUP_CONCAT(a.line_value || ':' || a.odds_over || ':' || a.merchant_name, '|') as all_lines_string
+            FROM (SELECT * FROM active_lines ORDER BY odds_over DESC) a
             LEFT JOIN sim_results s ON a.player_name = s.player_name AND a.prop_type = s.prop_type
             WHERE a.line_value IS NOT NULL AND s.ev_10 > 0
             GROUP BY a.player_name, a.prop_type
@@ -127,22 +128,23 @@ def get_data():
         data = []
         for row in results:
             d = dict(row)
-            # Split the alt_data string into a clean list of objects
             d['alt_lines'] = []
-            if d['alt_data']:
-                parts = d['alt_data'].split('|')
+            primary_val = d['primary_line']
+            primary_odds = d['odds_over']
+
+            if d['all_lines_string']:
+                parts = d['all_lines_string'].split('|')
                 for p in parts:
                     try:
-                        # Use rsplit to handle any unexpected colons in merchant names
-                        # It splits from the right, picking off the merchant name last
                         val, odds, book = p.rsplit(':', 2)
-                        d['alt_lines'].append({
-                            "line": float(val), 
-                            "odds": float(odds), 
-                            "book": book
-                        })
-                    except ValueError:
-                        # This skips the line if the data is corrupted instead of crashing the site
+                        val_float = float(val)
+                        odds_float = float(odds)
+                        
+                        # Only put it in dropdown if it's a different line OR a different book
+                        # We don't want to show the exact primary line again in its own dropdown
+                        if not (val_float == primary_val and odds_float == primary_odds):
+                            d['alt_lines'].append({"line": val_float, "odds": odds_float, "book": book})
+                    except:
                         continue
             data.append(d)
     except Exception as e:
