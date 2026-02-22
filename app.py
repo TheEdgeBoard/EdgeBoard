@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, render_template, render_template_string, session
+from flask import Flask, jsonify, request, render_template, render_template_string, session, redirect, url_for
 import sqlite3
 import os
 import sys
@@ -141,7 +141,6 @@ def get_data():
                         odds_float = float(odds)
                         
                         # Only put it in dropdown if it's a different line OR a different book
-                        # We don't want to show the exact primary line again in its own dropdown
                         if not (val_float == primary_val and odds_float == primary_odds):
                             d['alt_lines'].append({"line": val_float, "odds": odds_float, "book": book})
                     except:
